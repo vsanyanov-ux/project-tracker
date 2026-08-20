@@ -31,7 +31,7 @@ interface ProjectCardProps {
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onOpenDetail }) => {
   const { paid, owed, total, percentPaid } = calculateProjectFinancials(project);
   const progress = calculateProjectProgress(project);
-  const deadlineInfo = getDeadlineStatus(project.deadline);
+  const deadlineInfo = getDeadlineStatus(project.deadline, project.status);
   
   const statusInfo = STATUS_CONFIG[project.status] || STATUS_CONFIG.in_progress;
   const priorityInfo = PRIORITY_CONFIG[project.priority] || PRIORITY_CONFIG.medium;

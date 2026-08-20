@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.3-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Version](https://img.shields.io/badge/Version-1.0.0-indigo?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.0.1-indigo?style=for-the-badge)](CHANGELOG.md)
 
 > Премиальный веб-дашборд в стиле **Glassmorphism** для управления проектами, дедлайнами, этапами разработки, задачами и финансами. Разработан для фрилансеров, разработчиков и digital-агентств.
 

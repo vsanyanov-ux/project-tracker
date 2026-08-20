@@ -34,6 +34,8 @@ export const calculateFinancials = (projects: Project[]) => {
 };
 
 export const calculateProjectProgress = (project: Project): number => {
+  if (project.status === 'completed') return 100;
+
   if (project.tasks && project.tasks.length > 0) {
     const completedTasks = project.tasks.filter(t => t.completed).length;
     const taskProgress = Math.round((completedTasks / project.tasks.length) * 100);
@@ -53,14 +55,24 @@ export const calculateProjectProgress = (project: Project): number => {
     );
   }
 
-  if (project.status === 'completed') return 100;
   if (project.status === 'in_review') return 85;
   if (project.status === 'waiting_payment') return 95;
   if (project.status === 'in_progress') return 50;
   return 10;
 };
 
-export const getDeadlineStatus = (deadlineStr: string) => {
+export const getDeadlineStatus = (deadlineStr: string, status?: ProjectStatus) => {
+  if (status === 'completed') {
+    return {
+      daysLeft: 0,
+      isOverdue: false,
+      isUrgent: false,
+      label: 'Завершён ✓',
+      color: 'text-emerald-400',
+      badgeBg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+    };
+  }
+
   if (!deadlineStr) return { daysLeft: 0, isOverdue: false, isUrgent: false, label: 'Без дедлайна', color: 'text-slate-400', badgeBg: 'bg-slate-800/60 border-slate-700' };
   
   const today = new Date();
@@ -115,7 +127,7 @@ export const getDeadlineStatus = (deadlineStr: string) => {
   };
 };
 
-export const getTimelineMetrics = (startDateStr: string, deadlineStr: string) => {
+export const getTimelineMetrics = (startDateStr: string, deadlineStr: string, status?: ProjectStatus) => {
   const start = new Date(startDateStr || new Date().toISOString().split('T')[0]);
   const end = new Date(deadlineStr || new Date().toISOString().split('T')[0]);
   const now = new Date();
@@ -134,7 +146,7 @@ export const getTimelineMetrics = (startDateStr: string, deadlineStr: string) =>
     elapsedDays,
     daysLeft,
     timePercent,
-    isOverdue: daysLeft < 0
+    isOverdue: status === 'completed' ? false : daysLeft < 0
   };
 };
 

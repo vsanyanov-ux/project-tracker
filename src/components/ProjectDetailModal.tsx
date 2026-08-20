@@ -68,8 +68,8 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
   const { paid, owed, total, percentPaid } = calculateProjectFinancials(project);
   const progress = calculateProjectProgress(project);
-  const deadlineInfo = getDeadlineStatus(project.deadline);
-  const timeline = getTimelineMetrics(project.startDate, project.deadline);
+  const deadlineInfo = getDeadlineStatus(project.deadline, project.status);
+  const timeline = getTimelineMetrics(project.startDate, project.deadline, project.status);
   const statusConfig = STATUS_CONFIG[project.status];
   const theme = COLOR_THEME_GRADIENTS[project.colorTheme] || COLOR_THEME_GRADIENTS.purple;
 
