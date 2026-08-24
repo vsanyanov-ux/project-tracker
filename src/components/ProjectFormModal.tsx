@@ -29,8 +29,6 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
   onSave,
   initialProject
 }) => {
-  if (!isOpen) return null;
-
   const isEditing = !!initialProject;
 
   const [title, setTitle] = useState('');
@@ -288,6 +286,8 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto">
       <div 
@@ -414,8 +414,9 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
                 <option value="in_progress" className="bg-slate-900 text-white">В работе (Разработка)</option>
                 <option value="in_review" className="bg-slate-900 text-white">На проверке у клиента</option>
                 <option value="waiting_payment" className="bg-slate-900 text-white">Ожидает оплаты</option>
-                <option value="completed" className="bg-slate-900 text-white">Завершён</option>
+                <option value="completed" className="bg-slate-900 text-white">Завершён (В архив 📦)</option>
                 <option value="on_hold" className="bg-slate-900 text-white">На паузе</option>
+                <option value="cancelled" className="bg-slate-900 text-white">Отменён (В архив ✕)</option>
               </select>
             </div>
 

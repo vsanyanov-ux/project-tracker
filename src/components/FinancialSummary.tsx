@@ -1,23 +1,27 @@
 import React from 'react';
 import type { Project } from '../types/project';
 import { calculateFinancials, formatCurrency, calculateProjectProgress } from '../utils/formatters';
-import { Wallet, Clock, TrendingUp, CheckCircle2, ArrowUpRight, Flame } from 'lucide-react';
+import { Wallet, Clock, TrendingUp, CheckCircle2, ArrowUpRight, Flame, Archive } from 'lucide-react';
 
 interface FinancialSummaryProps {
   projects: Project[];
   onFilterStatus?: (status: string) => void;
+  onOpenArchive?: () => void;
 }
 
-export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ projects, onFilterStatus }) => {
+export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ projects, onFilterStatus, onOpenArchive }) => {
   const { totalEarned, totalOwed, totalBudget, paymentRate } = calculateFinancials(projects);
 
+  const isArchived = (p: Project) => p.status === 'completed' || p.status === 'cancelled';
   const activeProjects = projects.filter(p => p.status === 'in_progress');
   const reviewProjects = projects.filter(p => p.status === 'in_review');
   const completedProjects = projects.filter(p => p.status === 'completed');
-  const urgentProjects = projects.filter(p => p.priority === 'urgent');
+  const cancelledProjects = projects.filter(p => p.status === 'cancelled');
+  const urgentProjects = projects.filter(p => p.priority === 'urgent' && !isArchived(p));
 
-  const avgProgress = projects.length > 0
-    ? Math.round(projects.reduce((acc, p) => acc + calculateProjectProgress(p), 0) / projects.length)
+  const countableProjects = projects.filter(p => !isArchived(p));
+  const avgProgress = countableProjects.length > 0
+    ? Math.round(countableProjects.reduce((acc, p) => acc + calculateProjectProgress(p), 0) / countableProjects.length)
     : 0;
 
   return (
@@ -48,7 +52,7 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ projects, on
               <ArrowUpRight className="w-3.5 h-3.5" />
               {paymentRate}% от бюджета
             </span>
-            <span>{projects.filter(p => p.payments.some(pay => pay.isPaid)).length} проектов оплачивали</span>
+            <span>{projects.filter(p => !isArchived(p) && p.payments.some(pay => pay.isPaid)).length} проектов оплачивали</span>
           </div>
         </div>
 
@@ -74,7 +78,7 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ projects, on
             <span className="text-amber-400 font-medium">
               Остаток к получению
             </span>
-            <span>{projects.filter(p => p.payments.some(pay => !pay.isPaid)).length} проекта ждут выплат</span>
+            <span>{projects.filter(p => !isArchived(p) && p.payments.some(pay => !pay.isPaid)).length} проекта ждут выплат</span>
           </div>
         </div>
 
@@ -98,7 +102,7 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ projects, on
           </div>
           <div className="flex items-center justify-between text-xs text-slate-400 mt-2 pt-2 border-t border-white/5">
             <span className="text-cyan-400 font-medium">
-              Всего: {projects.length} проектов
+              В портфолио: {countableProjects.length} активных
             </span>
             {urgentProjects.length > 0 && (
               <span className="text-rose-400 flex items-center gap-0.5">
@@ -179,11 +183,18 @@ export const FinancialSummary: React.FC<FinancialSummaryProps> = ({ projects, on
           </button>
 
           <button 
-            onClick={() => onFilterStatus && onFilterStatus('completed')}
-            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 transition-all flex items-center gap-1"
+            onClick={() => {
+              if (onOpenArchive) {
+                onOpenArchive();
+              } else if (onFilterStatus) {
+                onFilterStatus('all');
+              }
+            }}
+            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Перейти в раздел «Архив»"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            Завершено: <span className="font-bold">{completedProjects.length}</span>
+            <Archive className="w-3.5 h-3.5 text-emerald-400" />
+            В архиве: <span className="font-bold">{completedProjects.length + cancelledProjects.length}</span>
           </button>
         </div>
       </div>

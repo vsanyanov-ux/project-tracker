@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import type { ViewMode, FilterOptions } from '../types/project';
+import type { ViewMode, FilterOptions, SortByOption, MainTab } from '../types/project';
 import { 
   Search, 
   Plus, 
@@ -11,7 +11,12 @@ import {
   RotateCcw, 
   Sparkles, 
   Filter,
-  X
+  ArrowUpDown,
+  ArrowDownNarrowWide,
+  ArrowUpNarrowWide,
+  X,
+  Archive,
+  Layers
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -24,6 +29,10 @@ interface HeaderProps {
   onImportData: (file: File) => void;
   onResetData: () => void;
   categories: string[];
+  currentTab: MainTab;
+  onTabChange: (tab: MainTab) => void;
+  activeCount: number;
+  archiveCount: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -35,7 +44,11 @@ export const Header: React.FC<HeaderProps> = ({
   onExportData,
   onImportData,
   onResetData,
-  categories
+  categories,
+  currentTab,
+  onTabChange,
+  activeCount,
+  archiveCount
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onViewModeChange('grid')}
               className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                 viewMode === 'grid'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? (currentTab === 'archive' ? 'bg-emerald-600 text-white shadow-md' : 'bg-indigo-600 text-white shadow-md')
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Вид: Сетка карточек"
@@ -120,24 +133,26 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">Сетка</span>
             </button>
 
-            <button
-              onClick={() => onViewModeChange('kanban')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                viewMode === 'kanban'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Вид: Канбан-доска"
-            >
-              <Kanban className="w-4 h-4" />
-              <span className="hidden sm:inline">Канбан</span>
-            </button>
+            {currentTab === 'active' && (
+              <button
+                onClick={() => onViewModeChange('kanban')}
+                className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  viewMode === 'kanban'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Вид: Канбан-доска"
+              >
+                <Kanban className="w-4 h-4" />
+                <span className="hidden sm:inline">Канбан</span>
+              </button>
+            )}
 
             <button
               onClick={() => onViewModeChange('table')}
               className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                 viewMode === 'table'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? (currentTab === 'archive' ? 'bg-emerald-600 text-white shadow-md' : 'bg-indigo-600 text-white shadow-md')
                   : 'text-slate-400 hover:text-slate-200'
               }`}
               title="Вид: Таблица"
@@ -197,45 +212,124 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
+      {/* Primary Section Switcher: Active Projects vs Archive */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              onTabChange('active');
+              if (filters.status === 'completed' || filters.status === 'cancelled') {
+                onFilterChange({ status: 'all' });
+              }
+            }}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              currentTab === 'active'
+                ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-600/30'
+                : 'glass-panel text-slate-400 hover:text-white border-white/5 hover:border-white/20'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Активные проекты</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              currentTab === 'active' ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-400'
+            }`}>
+              {activeCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              onTabChange('archive');
+              if (filters.status !== 'all' && filters.status !== 'completed' && filters.status !== 'cancelled') {
+                onFilterChange({ status: 'all' });
+              }
+            }}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              currentTab === 'archive'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30'
+                : 'glass-panel text-slate-400 hover:text-white border-white/5 hover:border-white/20'
+            }`}
+          >
+            <Archive className="w-4 h-4" />
+            <span>Архив</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              currentTab === 'archive' 
+                ? 'bg-white/20 text-white' 
+                : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+            }`}>
+              {archiveCount}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Filter Chips Bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
         
         {/* Status Filter Chips */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-slate-500 mr-1 flex items-center gap-1 font-medium">
-            <Filter className="w-3.5 h-3.5" />
-            Статус:
-          </span>
+        {currentTab === 'active' ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-500 mr-1 flex items-center gap-1 font-medium">
+              <Filter className="w-3.5 h-3.5" />
+              Статус:
+            </span>
 
-          {[
-            { id: 'all', label: 'Все проекты' },
-            { id: 'in_progress', label: 'В работе' },
-            { id: 'in_review', label: 'На проверке' },
-            { id: 'waiting_payment', label: 'Ожидает оплаты' },
-            { id: 'completed', label: 'Завершённые' },
-            { id: 'backlog', label: 'Бэклог' }
-          ].map((st) => (
-            <button
-              key={st.id}
-              onClick={() => onFilterChange({ status: st.id })}
-              className={`px-3 py-1 rounded-full transition-all text-xs font-semibold ${
-                filters.status === st.id
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'glass-panel text-slate-400 hover:text-slate-200 border-white/5 hover:border-white/20'
-              }`}
-            >
-              {st.label}
-            </button>
-          ))}
-        </div>
+            {[
+              { id: 'all', label: 'Все активные' },
+              { id: 'in_progress', label: 'В работе' },
+              { id: 'in_review', label: 'На проверке' },
+              { id: 'waiting_payment', label: 'Ожидает оплаты' },
+              { id: 'backlog', label: 'Бэклог' },
+              { id: 'on_hold', label: 'На паузе' }
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => onFilterChange({ status: st.id })}
+                className={`px-3 py-1 rounded-full transition-all text-xs font-semibold ${
+                  filters.status === st.id
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'glass-panel text-slate-400 hover:text-slate-200 border-white/5 hover:border-white/20'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-500 mr-1 flex items-center gap-1 font-medium">
+              <Archive className="w-3.5 h-3.5" />
+              В архиве:
+            </span>
 
-        {/* Category & Priority Dropdowns */}
-        <div className="flex items-center gap-2">
+            {[
+              { id: 'all', label: 'Все в архиве' },
+              { id: 'completed', label: 'Завершённые ✓' },
+              { id: 'cancelled', label: 'Отменённые ✕' }
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => onFilterChange({ status: st.id })}
+                className={`px-3 py-1 rounded-full transition-all text-xs font-semibold ${
+                  filters.status === st.id
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                    : 'glass-panel text-slate-400 hover:text-slate-200 border-white/5 hover:border-white/20'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Category, Priority & Sort Dropdowns */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Category Filter */}
           <select
             value={filters.category}
             onChange={(e) => onFilterChange({ category: e.target.value })}
-            className="glass-input text-xs px-3 py-1 rounded-full cursor-pointer bg-slate-900 border-white/10"
+            className="glass-input text-xs px-3 py-1 rounded-full cursor-pointer bg-slate-900 border-white/10 text-slate-300 hover:text-white transition-colors"
+            title="Фильтр по категории"
           >
             <option value="all">Все категории</option>
             {categories.map((c) => (
@@ -249,7 +343,8 @@ export const Header: React.FC<HeaderProps> = ({
           <select
             value={filters.priority}
             onChange={(e) => onFilterChange({ priority: e.target.value })}
-            className="glass-input text-xs px-3 py-1 rounded-full cursor-pointer bg-slate-900 border-white/10"
+            className="glass-input text-xs px-3 py-1 rounded-full cursor-pointer bg-slate-900 border-white/10 text-slate-300 hover:text-white transition-colors"
+            title="Фильтр по приоритету"
           >
             <option value="all">Все приоритеты</option>
             <option value="urgent">🔥 Срочно</option>
@@ -257,6 +352,49 @@ export const Header: React.FC<HeaderProps> = ({
             <option value="medium">🔵 Средний</option>
             <option value="low">🟢 Низкий</option>
           </select>
+
+          {/* Sort Controls Group */}
+          <div className="flex items-center glass-panel rounded-full border border-white/10 bg-slate-900/80 px-2 py-0.5 shadow-sm">
+            <span className="text-slate-400 flex items-center gap-1 text-[11px] font-medium pointer-events-none pl-1">
+              <ArrowUpDown className="w-3 h-3 text-indigo-400" />
+            </span>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => {
+                const newSortBy = e.target.value as SortByOption;
+                if (newSortBy === 'priority' && filters.sortBy !== 'priority') {
+                  onFilterChange({ sortBy: newSortBy, sortOrder: 'desc' });
+                } else {
+                  onFilterChange({ sortBy: newSortBy });
+                }
+              }}
+              className="bg-transparent text-xs py-0.5 px-1.5 cursor-pointer text-slate-200 focus:outline-none focus:ring-0 border-none font-medium"
+              title="Параметр сортировки проектов"
+            >
+              <option value="priority" className="bg-slate-900 text-slate-200">🔥 По приоритету</option>
+              <option value="deadline" className="bg-slate-900 text-slate-200">📅 По дедлайну</option>
+              <option value="progress" className="bg-slate-900 text-slate-200">📊 По готовности</option>
+              <option value="budget" className="bg-slate-900 text-slate-200">💰 По бюджету</option>
+              <option value="title" className="bg-slate-900 text-slate-200">🔤 По названию</option>
+              <option value="updatedAt" className="bg-slate-900 text-slate-200">🕒 По обновлению</option>
+            </select>
+
+            <button
+              onClick={() => onFilterChange({ sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' })}
+              className="p-1 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition-all text-xs flex items-center justify-center"
+              title={
+                filters.sortBy === 'priority'
+                  ? (filters.sortOrder === 'desc' ? 'Сначала срочные (🔥) ➔ Низкие (🟢)' : 'Сначала низкие (🟢) ➔ Срочные (🔥)')
+                  : (filters.sortOrder === 'desc' ? 'По убыванию' : 'По возрастанию')
+              }
+            >
+              {filters.sortOrder === 'desc' ? (
+                <ArrowDownNarrowWide className="w-3.5 h-3.5 text-indigo-400" />
+              ) : (
+                <ArrowUpNarrowWide className="w-3.5 h-3.5 text-indigo-400" />
+              )}
+            </button>
+          </div>
         </div>
 
       </div>

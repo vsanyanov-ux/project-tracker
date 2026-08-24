@@ -4,7 +4,8 @@ export type ProjectStatus =
   | 'in_review'
   | 'waiting_payment'
   | 'completed'
-  | 'on_hold';
+  | 'on_hold'
+  | 'cancelled';
 
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -79,13 +80,17 @@ export interface Project {
   updatedAt: string;
 }
 
+export type SortByOption = 'priority' | 'deadline' | 'progress' | 'budget' | 'title' | 'updatedAt';
+
 export interface FilterOptions {
   search: string;
   status: string;
   category: string;
   priority: string;
-  sortBy: 'deadline' | 'progress' | 'budget' | 'title' | 'updatedAt';
+  sortBy: SortByOption;
   sortOrder: 'asc' | 'desc';
 }
 
 export type ViewMode = 'grid' | 'kanban' | 'table';
+
+export type MainTab = 'active' | 'archive';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Project, ProjectStatus, Priority, Task, Payment, ProjectLink } from '../types/project';
 import { 
   formatCurrency, 
@@ -28,7 +28,9 @@ import {
   Link as LinkIcon,
   CheckCircle2,
   AlertCircle,
-  Zap
+  Zap,
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -51,8 +53,6 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   onDeleteProject,
   onOpenEditModal
 }) => {
-  if (!isOpen) return null;
-
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newPaymentTitle, setNewPaymentTitle] = useState('');
@@ -60,8 +60,14 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkType, setNewLinkType] = useState<ProjectLink['type']>('other');
-  const [notesDraft, setNotesDraft] = useState(project.notes || '');
+  const [notesDraft, setNotesDraft] = useState(project ? (project.notes || '') : '');
   const [isNotesSaved, setIsNotesSaved] = useState(false);
+
+  useEffect(() => {
+    if (project) {
+      setNotesDraft(project.notes || '');
+    }
+  }, [project]);
 
   // Quick Prepayment adjustment input state
   const [quickPrepaymentInput, setQuickPrepaymentInput] = useState<string>('');
@@ -288,6 +294,8 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     setTimeout(() => setIsNotesSaved(false), 2000);
   };
 
+  if (!isOpen || !project) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto">
       <div 
@@ -320,15 +328,26 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
               {/* Status Select */}
               <select
                 value={project.status}
-                onChange={(e) => onUpdateProject({ ...project, status: e.target.value as ProjectStatus, updatedAt: new Date().toISOString() })}
+                onChange={(e) => {
+                  const nextStatus = e.target.value as ProjectStatus;
+                  if (nextStatus === 'completed') {
+                    confetti({
+                      particleCount: 60,
+                      spread: 60,
+                      origin: { y: 0.5 }
+                    });
+                  }
+                  onUpdateProject({ ...project, status: nextStatus, updatedAt: new Date().toISOString() });
+                }}
                 className={`text-xs font-semibold px-3 py-0.5 rounded-full border bg-slate-900 cursor-pointer focus:outline-none ${statusConfig.border} ${statusConfig.text}`}
               >
                 <option value="backlog">Бэклог / План</option>
                 <option value="in_progress">В работе</option>
                 <option value="in_review">На проверке</option>
                 <option value="waiting_payment">Ждёт оплаты</option>
-                <option value="completed">Завершён</option>
+                <option value="completed">Завершён (В архив 📦)</option>
                 <option value="on_hold">На паузе</option>
+                <option value="cancelled">Отменён (В архив 📦 ✕)</option>
               </select>
             </div>
 
@@ -386,6 +405,54 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Archived Banner Notice */}
+        {project.status === 'completed' && (
+          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs flex-wrap shadow-lg">
+            <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+              <Archive className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>Этот проект завершён и находится в разделе «Архив».</span>
+            </div>
+            <button
+              onClick={() => {
+                onUpdateProject({
+                  ...project,
+                  status: 'in_progress',
+                  updatedAt: new Date().toISOString()
+                });
+              }}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/30 cursor-pointer text-xs"
+              title="Вернуть проект из архива в статус «В работе»"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Вернуть в активную работу</span>
+            </button>
+          </div>
+        )}
+
+        {/* Cancelled Banner Notice */}
+        {project.status === 'cancelled' && (
+          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-zinc-800/90 border border-zinc-600/50 flex items-center justify-between gap-3 text-xs flex-wrap shadow-lg">
+            <div className="flex items-center gap-2 text-zinc-300 font-semibold">
+              <AlertCircle className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+              <span>Этот проект отменён и перемещён в «Архив». Бюджет и остаток долга сброшены (0 {project.currency}).</span>
+            </div>
+            <button
+              onClick={() => {
+                onUpdateProject({
+                  ...project,
+                  status: 'in_progress',
+                  updatedAt: new Date().toISOString()
+                });
+              }}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 cursor-pointer text-xs"
+              title="Возобновить проект"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Возобновить разработку</span>
+            </button>
+          </div>
+        )}
 
         {/* Timeline & Money Banner */}
         <div className="bg-slate-950/60 p-4 border-b border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">

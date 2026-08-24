@@ -1,0 +1,7 @@
+services:
+  project-tracker:
+    build: .
+    container_name: project-tracker
+    restart: unless-stopped
+    ports:
+      - "80:80"

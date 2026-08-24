@@ -1,4 +1,4 @@
-import type { Project } from '../types/project';
+import type { Project, Priority, ColorTheme } from '../types/project';
 import { INITIAL_PROJECTS } from '../data/initialProjects';
 
 const STORAGE_KEY = 'antigravity_projects_data_v1';
@@ -12,7 +12,43 @@ export const getStoredProjects = (): Project[] => {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      const yatvInit = INITIAL_PROJECTS.find((p) => p.id === 'proj-yatv');
+      let updated = false;
+
+      let merged: Project[] = (parsed as Project[]).map((p: Project): Project => {
+        // If user already had a project containing 'ятв', update it with full milestones and schedule
+        if (yatvInit && (p.id === 'proj-yatv' || p.title.toLowerCase().includes('ятв'))) {
+          updated = true;
+          return {
+            ...p,
+            id: p.id || 'proj-yatv',
+            title: p.title || yatvInit.title,
+            description: yatvInit.description,
+            category: 'Мультимедиа',
+            status: p.status || 'in_progress',
+            priority: 'urgent' as Priority,
+            startDate: yatvInit.startDate,
+            deadline: yatvInit.deadline,
+            colorTheme: 'rose' as ColorTheme,
+            milestones: yatvInit.milestones,
+            tasks: yatvInit.tasks,
+            notes: yatvInit.notes,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return p;
+      });
+
+      const hasYatv = merged.some((p: Project) => p.id === 'proj-yatv' || p.title.toLowerCase().includes('ятв'));
+      if (!hasYatv && yatvInit) {
+        merged.unshift(yatvInit);
+        updated = true;
+      }
+
+      if (updated) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      }
+      return merged;
     }
     return INITIAL_PROJECTS;
   } catch (err) {

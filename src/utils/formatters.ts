@@ -5,6 +5,10 @@ export const formatCurrency = (amount: number, currency: string = '₽'): string
 };
 
 export const calculateProjectFinancials = (project: Project) => {
+  if (project.status === 'cancelled') {
+    return { paid: 0, owed: 0, total: 0, percentPaid: 0 };
+  }
+
   const paid = (project.payments || [])
     .filter(p => p.isPaid)
     .reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -35,6 +39,7 @@ export const calculateFinancials = (projects: Project[]) => {
 
 export const calculateProjectProgress = (project: Project): number => {
   if (project.status === 'completed') return 100;
+  if (project.status === 'cancelled') return 0;
 
   if (project.tasks && project.tasks.length > 0) {
     const completedTasks = project.tasks.filter(t => t.completed).length;
@@ -70,6 +75,17 @@ export const getDeadlineStatus = (deadlineStr: string, status?: ProjectStatus) =
       label: 'Завершён ✓',
       color: 'text-emerald-400',
       badgeBg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+    };
+  }
+
+  if (status === 'cancelled') {
+    return {
+      daysLeft: 0,
+      isOverdue: false,
+      isUrgent: false,
+      label: 'Отменён ✕',
+      color: 'text-slate-400',
+      badgeBg: 'bg-slate-800/60 border-slate-700 text-slate-400'
     };
   }
 
@@ -146,7 +162,7 @@ export const getTimelineMetrics = (startDateStr: string, deadlineStr: string, st
     elapsedDays,
     daysLeft,
     timePercent,
-    isOverdue: status === 'completed' ? false : daysLeft < 0
+    isOverdue: (status === 'completed' || status === 'cancelled') ? false : daysLeft < 0
   };
 };
 
@@ -202,6 +218,13 @@ export const STATUS_CONFIG: Record<ProjectStatus, { label: string; bg: string; t
     text: 'text-rose-400',
     border: 'border-rose-500/40',
     glow: 'rgba(244, 63, 94, 0.4)'
+  },
+  cancelled: {
+    label: 'Отменён',
+    bg: 'bg-zinc-800/80',
+    text: 'text-zinc-400',
+    border: 'border-zinc-600/50',
+    glow: 'rgba(161, 161, 170, 0.2)'
   }
 };
 
@@ -210,6 +233,13 @@ export const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; d
   medium: { label: 'Средний', color: 'text-blue-400', dotClass: 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]', badge: 'bg-blue-950/60 text-blue-300 border-blue-800/60' },
   high: { label: 'Высокий', color: 'text-amber-400', dotClass: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]', badge: 'bg-amber-950/60 text-amber-300 border-amber-800/60' },
   urgent: { label: 'Срочно 🔥', color: 'text-rose-400', dotClass: 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,1)] animate-pulse', badge: 'bg-rose-950/60 text-rose-300 border-rose-800/60' }
+};
+
+export const PRIORITY_WEIGHTS: Record<Priority, number> = {
+  urgent: 4,
+  high: 3,
+  medium: 2,
+  low: 1
 };
 
 export const COLOR_THEME_GRADIENTS: Record<string, { ring: string; bar: string; text: string; bgSoft: string; border: string; glow: string }> = {
