@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Project, ProjectStatus, FilterOptions, ViewMode, MainTab } from './types/project';
+import type { Client } from './types/client';
 import { DEFAULT_CATEGORIES } from './types/project';
 import { getStoredProjects, saveProjects, resetToDefaultProjects, exportProjectsToJson, importProjectsFromJson } from './utils/storage';
+import { getStoredClients, saveClients, seedClientsFromProjects } from './utils/clientStorage';
 import { PRIORITY_WEIGHTS, calculateProjectProgress, calculateProjectFinancials } from './utils/formatters';
 import { BackgroundGlow } from './components/BackgroundGlow';
 import { Header } from './components/Header';
@@ -10,13 +12,16 @@ import { ProjectCard } from './components/ProjectCard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ProjectTableView } from './components/ProjectTableView';
 import { ArchiveView } from './components/ArchiveView';
+import { CrmView } from './components/CrmView';
 import { ProjectDetailModal } from './components/ProjectDetailModal';
 import { ProjectFormModal } from './components/ProjectFormModal';
+import { ClientFormModal } from './components/ClientFormModal';
 import { Plus, FolderSearch, CheckCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export function App() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [currentTab, setCurrentTab] = useState<MainTab>('active');
   const [viewMode, setViewModeState] = useState<ViewMode>(() => {
     try {
@@ -41,6 +46,11 @@ export function App() {
   // Form Modal state
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [prefilledClientForProject, setPrefilledClientForProject] = useState<Client | null>(null);
+
+  // Client Modal state
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -64,8 +74,17 @@ export function App() {
 
   // Load from storage on mount
   useEffect(() => {
-    const loaded = getStoredProjects();
-    setProjects(loaded);
+    const loadedProjects = getStoredProjects();
+    setProjects(loadedProjects);
+
+    const loadedClients = getStoredClients();
+    if (loadedClients.length === 0 && loadedProjects.length > 0) {
+      const seeded = seedClientsFromProjects(loadedProjects, []);
+      setClients(seeded);
+      saveClients(seeded);
+    } else {
+      setClients(loadedClients);
+    }
   }, []);
 
   // Update Filters helper
@@ -243,17 +262,65 @@ export function App() {
     handleQuickStatusChange(projectId, 'in_progress');
   };
 
+  // Client CRUD Operations
+  const handleSaveClient = (savedClient: Client) => {
+    const exists = clients.some((c) => c.id === savedClient.id);
+    let updatedList: Client[];
+    if (exists) {
+      updatedList = clients.map((c) => (c.id === savedClient.id ? savedClient : c));
+      showToast(`Клиент "${savedClient.name}" обновлен`);
+    } else {
+      updatedList = [savedClient, ...clients];
+      showToast(`Клиент "${savedClient.name}" добавлен в CRM! 🎉`);
+    }
+    setClients(updatedList);
+    saveClients(updatedList);
+    setEditingClient(null);
+  };
+
+  const handleDeleteClient = (clientId: string) => {
+    const client = clients.find((c) => c.id === clientId);
+    const updatedList = clients.filter((c) => c.id !== clientId);
+    setClients(updatedList);
+    saveClients(updatedList);
+    showToast(`Клиент "${client?.name || ''}" удален из CRM базы`);
+  };
+
+  const handleSyncClientsFromProjects = () => {
+    const prevCount = clients.length;
+    const merged = seedClientsFromProjects(projects, clients);
+    const newCount = merged.length - prevCount;
+    setClients(merged);
+    saveClients(merged);
+    if (newCount > 0) {
+      showToast(`Собрано новых клиентов из проектов: ${newCount}! 🚀`);
+    } else {
+      showToast('Все клиенты из проектов уже занесены в CRM базу.');
+    }
+  };
+
+  const handleCreateProjectForClient = (client: Client) => {
+    setEditingProject(null);
+    setPrefilledClientForProject(client);
+    setIsFormModalOpen(true);
+  };
+
   // Export / Import / Reset
   const handleExportData = () => {
-    exportProjectsToJson(projects);
-    showToast('Бэкап проектов экспортирован в JSON');
+    exportProjectsToJson(projects, clients);
+    showToast('Полный бэкап проектов и CRM базы экспортирован в JSON');
   };
 
   const handleImportData = async (file: File) => {
     try {
       const imported = await importProjectsFromJson(file);
-      setProjects(imported);
-      showToast(`Успешно импортировано ${imported.length} проектов!`);
+      setProjects(imported.projects);
+      if (imported.clients && imported.clients.length > 0) {
+        setClients(imported.clients);
+        showToast(`Импортировано ${imported.projects.length} проектов и ${imported.clients.length} клиентов!`);
+      } else {
+        showToast(`Успешно импортировано ${imported.projects.length} проектов!`);
+      }
     } catch (err: any) {
       alert(err.message || 'Ошибка импорта файла');
     }
@@ -262,7 +329,10 @@ export function App() {
   const handleResetData = () => {
     const defaults = resetToDefaultProjects();
     setProjects(defaults);
-    showToast('Данные сброшены к 5 стартовым проектам');
+    const seeded = seedClientsFromProjects(defaults, []);
+    setClients(seeded);
+    saveClients(seeded);
+    showToast('Данные сброшены к 5 стартовым проектам и клиентам');
   };
 
   const currentSelectedProject = projects.find((p) => p.id === selectedProjectId) || null;
@@ -283,7 +353,12 @@ export function App() {
           onViewModeChange={setViewMode}
           onOpenNewProject={() => {
             setEditingProject(null);
+            setPrefilledClientForProject(null);
             setIsFormModalOpen(true);
+          }}
+          onOpenNewClient={() => {
+            setEditingClient(null);
+            setIsClientModalOpen(true);
           }}
           onExportData={handleExportData}
           onImportData={handleImportData}
@@ -293,9 +368,10 @@ export function App() {
           onTabChange={setCurrentTab}
           activeCount={activeCount}
           archiveCount={archiveCount}
+          clientsCount={clients.length}
         />
 
-        {/* Section View: Active vs Archive */}
+        {/* Section View: Active vs Archive vs CRM */}
         {currentTab === 'archive' ? (
           /* Archive Section View */
           <ArchiveView
@@ -309,6 +385,25 @@ export function App() {
               setCurrentTab('active');
               handleFilterChange({ status: 'all' });
             }}
+          />
+        ) : currentTab === 'clients' ? (
+          /* CRM Clients Section View */
+          <CrmView
+            clients={clients}
+            projects={projects}
+            onOpenNewClient={() => {
+              setEditingClient(null);
+              setIsClientModalOpen(true);
+            }}
+            onEditClient={(c) => {
+              setEditingClient(c);
+              setIsClientModalOpen(true);
+            }}
+            onDeleteClient={handleDeleteClient}
+            onCreateProjectForClient={handleCreateProjectForClient}
+            onOpenProjectDetail={(id) => setSelectedProjectId(id)}
+            onSyncFromProjects={handleSyncClientsFromProjects}
+            externalSearch={filters.search}
           />
         ) : (
           /* Active Projects Section View */
@@ -418,9 +513,23 @@ export function App() {
         onClose={() => {
           setIsFormModalOpen(false);
           setEditingProject(null);
+          setPrefilledClientForProject(null);
         }}
         onSave={handleSaveProjectFromForm}
         initialProject={editingProject}
+        existingClients={clients}
+        prefilledClient={prefilledClientForProject}
+      />
+
+      {/* Create / Edit Client Modal */}
+      <ClientFormModal
+        isOpen={isClientModalOpen}
+        onClose={() => {
+          setIsClientModalOpen(false);
+          setEditingClient(null);
+        }}
+        onSave={handleSaveClient}
+        clientToEdit={editingClient}
       />
 
       {/* Floating Toast Notification */}

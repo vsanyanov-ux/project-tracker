@@ -16,7 +16,9 @@ import {
   ArrowUpNarrowWide,
   X,
   Archive,
-  Layers
+  Layers,
+  Users,
+  UserPlus
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -33,6 +35,8 @@ interface HeaderProps {
   onTabChange: (tab: MainTab) => void;
   activeCount: number;
   archiveCount: number;
+  clientsCount?: number;
+  onOpenNewClient?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -48,7 +52,9 @@ export const Header: React.FC<HeaderProps> = ({
   currentTab,
   onTabChange,
   activeCount,
-  archiveCount
+  archiveCount,
+  clientsCount = 0,
+  onOpenNewClient
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,10 +94,11 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Mobile + Button */}
           <button
-            onClick={onOpenNewProject}
-            className="md:hidden p-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-indigo-600/30"
+            onClick={currentTab === 'clients' ? (onOpenNewClient || onOpenNewProject) : onOpenNewProject}
+            className="md:hidden p-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer"
+            title={currentTab === 'clients' ? 'Новый клиент' : 'Новый проект'}
           >
-            <Plus className="w-4 h-4" />
+            {currentTab === 'clients' ? <UserPlus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           </button>
         </div>
 
@@ -200,21 +207,31 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Desktop "+ Новый проект" button */}
-          <button
-            onClick={onOpenNewProject}
-            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs transition-all shadow-[0_0_15px_rgba(99,102,241,0.4)]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Новый проект</span>
-          </button>
+          {/* Desktop "+ Новый проект / клиент" button */}
+          {currentTab === 'clients' ? (
+            <button
+              onClick={onOpenNewClient || onOpenNewProject}
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold text-xs transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Новый клиент</span>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenNewProject}
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs transition-all shadow-[0_0_15px_rgba(99,102,241,0.4)] cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Новый проект</span>
+            </button>
+          )}
 
         </div>
       </div>
 
-      {/* Primary Section Switcher: Active Projects vs Archive */}
+      {/* Primary Section Switcher: Active Projects vs Archive vs CRM */}
       <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => {
               onTabChange('active');
@@ -260,10 +277,32 @@ export const Header: React.FC<HeaderProps> = ({
               {archiveCount}
             </span>
           </button>
+
+          <button
+            onClick={() => {
+              onTabChange('clients');
+            }}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              currentTab === 'clients'
+                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-cyan-600/30'
+                : 'glass-panel text-slate-400 hover:text-white border-white/5 hover:border-white/20'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Клиенты / CRM</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              currentTab === 'clients' 
+                ? 'bg-white/20 text-white' 
+                : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+            }`}>
+              {clientsCount}
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* Filter Chips Bar */}
+      {/* Filter Chips Bar (hidden on CRM tab) */}
+      {currentTab !== 'clients' && (
       <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
         
         {/* Status Filter Chips */}
@@ -398,6 +437,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
       </div>
+      )}
     </header>
   );
 };

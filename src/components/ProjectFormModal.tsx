@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Project, ProjectStatus, Priority, ColorTheme, Payment, Task, ProjectMilestone } from '../types/project';
+import type { Client } from '../types/client';
 import { DEFAULT_CATEGORIES } from '../types/project';
 import { X, Plus, Trash2, Sparkles, Wallet, CheckCircle2, Clock } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
@@ -9,6 +10,8 @@ interface ProjectFormModalProps {
   onClose: () => void;
   onSave: (project: Project) => void;
   initialProject?: Project | null; // If editing
+  existingClients?: Client[];
+  prefilledClient?: Client | null;
 }
 
 const CATEGORY_PRESETS = [...DEFAULT_CATEGORIES];
@@ -27,7 +30,9 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  initialProject
+  initialProject,
+  existingClients,
+  prefilledClient
 }) => {
   const isEditing = !!initialProject;
 
@@ -83,8 +88,12 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
       // Reset defaults for new project (e.g. 10 000 budget, 5 000 prepay)
       setTitle('');
       setDescription('');
-      setClient('');
-      setClientContact('');
+      setClient(prefilledClient ? prefilledClient.name : '');
+      setClientContact(
+        prefilledClient
+          ? (prefilledClient.telegram || prefilledClient.phone || prefilledClient.email || '')
+          : ''
+      );
       setCategory('Лендинг');
       setStatus('in_progress');
       setPriority('high');
@@ -102,7 +111,20 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
         'Тестирование и сдача клиенту'
       ]);
     }
-  }, [initialProject, isOpen]);
+  }, [initialProject, prefilledClient, isOpen]);
+
+  const handleClientChange = (name: string) => {
+    setClient(name);
+    if (existingClients && name.trim()) {
+      const match = existingClients.find(
+        (c) => c.name.toLowerCase() === name.trim().toLowerCase()
+      );
+      if (match && !clientContact) {
+        const contact = match.telegram || match.phone || match.email || '';
+        if (contact) setClientContact(contact);
+      }
+    }
+  };
 
   const handleSetPrepayPercent = (percent: number) => {
     const calculated = Math.round((totalBudget * percent) / 100);
@@ -340,11 +362,21 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
               <input
                 type="text"
                 required
+                list="crm-clients-list"
                 value={client}
-                onChange={(e) => setClient(e.target.value)}
+                onChange={(e) => handleClientChange(e.target.value)}
                 placeholder="Ольга Потапова / Соломастер"
                 className="w-full glass-input px-4 py-2.5 rounded-xl"
               />
+              {existingClients && existingClients.length > 0 && (
+                <datalist id="crm-clients-list">
+                  {existingClients.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.company && c.company !== c.name ? `${c.company} (${c.name})` : c.name}
+                    </option>
+                  ))}
+                </datalist>
+              )}
             </div>
             <div>
               <label className="block text-slate-300 font-semibold mb-1.5">

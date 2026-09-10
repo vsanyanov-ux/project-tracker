@@ -75,13 +75,19 @@ export const resetToDefaultProjects = (): Project[] => {
   }
 };
 
-export const exportProjectsToJson = (projects: Project[]): void => {
+import type { Client } from '../types/client';
+import { saveClients } from './clientStorage';
+
+export const exportProjectsToJson = (projects: Project[], clients?: Client[]): void => {
   try {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(projects, null, 2));
+    const payload = clients && clients.length > 0
+      ? { version: '2.0', exportedAt: new Date().toISOString(), projects, clients }
+      : projects;
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
     const dateStr = new Date().toISOString().split('T')[0];
-    downloadAnchor.setAttribute('download', `projects_backup_${dateStr}.json`);
+    downloadAnchor.setAttribute('download', `projects_crm_backup_${dateStr}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -90,7 +96,12 @@ export const exportProjectsToJson = (projects: Project[]): void => {
   }
 };
 
-export const importProjectsFromJson = (file: File): Promise<Project[]> => {
+export interface ImportedData {
+  projects: Project[];
+  clients?: Client[];
+}
+
+export const importProjectsFromJson = (file: File): Promise<ImportedData> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -99,9 +110,15 @@ export const importProjectsFromJson = (file: File): Promise<Project[]> => {
         const parsed = JSON.parse(text);
         if (Array.isArray(parsed)) {
           saveProjects(parsed);
-          resolve(parsed);
+          resolve({ projects: parsed });
+        } else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects)) {
+          saveProjects(parsed.projects);
+          if (Array.isArray(parsed.clients)) {
+            saveClients(parsed.clients);
+          }
+          resolve({ projects: parsed.projects, clients: parsed.clients });
         } else {
-          reject(new Error('Некорректный формат файла. Ожидался массив проектов.'));
+          reject(new Error('Некорректный формат файла. Ожидался массив проектов или объект с проектами.'));
         }
       } catch (e) {
         console.error(e);
@@ -112,3 +129,4 @@ export const importProjectsFromJson = (file: File): Promise<Project[]> => {
     reader.readAsText(file);
   });
 };
+

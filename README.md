@@ -4,9 +4,9 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.3-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Version](https://img.shields.io/badge/Version-1.1.0-indigo?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.0-indigo?style=for-the-badge)](CHANGELOG.md)
 
-> Премиальный веб-дашборд в стиле **Glassmorphism** для управления проектами, дедлайнами, этапами разработки, задачами и финансами. Разработан для фрилансеров, разработчиков и digital-агентств.
+> Премиальный веб-дашборд в стиле **Glassmorphism** для управления проектами, дедлайнами, клиентами (Мини-CRM), задачами и финансами. Разработан для фрилансеров, разработчиков и digital-агентств.
 
 ---
 
@@ -22,6 +22,7 @@
 2. **Канбан-доска 2.0 (Kanban View)** — интерактивный **Drag-and-Drop** перенос карточек между стадиями (*Бэклог ➔ В работе ➔ На проверке ➔ Ждёт оплаты ➔ Завершено*), подсчет задач (`X/Y`) и суммарных бюджетов колонок.
 3. **Таблица (Table View)** — компактный сортируемый список по всем параметрам (название, заказчик, дата сдачи, готовность, бюджет, полученная предоплата, долг).
 4. **📦 Архив проектов (Archive View)** — изолированное хранилище завершенных и отмененных проектов с возможностью восстановления в 1 клик, очистки и раздельной финансовой аналитики.
+5. **👥 Мини-CRM и Клиенты (CRM Hub)** — централизованная база заказчиков с расчетом LTV (Lifetime Value), напоминаниями о повторных контактах (Follow-up), быстрыми ссылками в Telegram, заметками и созданием проектов в 1 клик.
 
 ### 💰 Финансовый трекер и управление предоплатой
 - Учет общей суммы контракта, внесенного аванса и оставшегося долга клиента.

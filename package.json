@@ -1,7 +1,7 @@
 {
   "name": "project-tracker",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Glassmorphism Project & Freelance Management Dashboard",
   "type": "module",
   "scripts": {
