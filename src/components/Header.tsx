@@ -229,9 +229,32 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Primary Section Switcher: Active Projects vs Archive vs CRM */}
+      {/* Primary Section Switcher: CRM vs Active Projects vs Archive */}
       <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 1. Клиенты / CRM */}
+          <button
+            onClick={() => {
+              onTabChange('clients');
+            }}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              currentTab === 'clients'
+                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-cyan-600/30'
+                : 'glass-panel text-slate-400 hover:text-white border-white/5 hover:border-white/20'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Клиенты / CRM</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              currentTab === 'clients' 
+                ? 'bg-white/20 text-white' 
+                : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+            }`}>
+              {clientsCount}
+            </span>
+          </button>
+
+          {/* 2. Активные проекты */}
           <button
             onClick={() => {
               onTabChange('active');
@@ -254,6 +277,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
+          {/* 3. Архив */}
           <button
             onClick={() => {
               onTabChange('archive');
@@ -275,27 +299,6 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
             }`}>
               {archiveCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              onTabChange('clients');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              currentTab === 'clients'
-                ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-cyan-600/30'
-                : 'glass-panel text-slate-400 hover:text-white border-white/5 hover:border-white/20'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Клиенты / CRM</span>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
-              currentTab === 'clients' 
-                ? 'bg-white/20 text-white' 
-                : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-            }`}>
-              {clientsCount}
             </span>
           </button>
         </div>

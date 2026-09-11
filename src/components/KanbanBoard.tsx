@@ -39,7 +39,7 @@ const COLUMNS: KanbanColumnDef[] = [
   { status: 'in_progress', title: 'В работе', desc: 'Активная разработка', accent: 'from-blue-500/20 to-indigo-500/10' },
   { status: 'in_review', title: 'На проверке', desc: 'Согласование с клиентом', accent: 'from-amber-500/20 to-orange-500/10' },
   { status: 'waiting_payment', title: 'Ждёт оплаты', desc: 'Ожидание счетов/оплаты', accent: 'from-purple-500/20 to-pink-500/10' },
-  { status: 'on_hold', title: 'На паузе', desc: 'Временно приостановлен', accent: 'from-rose-500/20 to-rose-600/10' }
+  { status: 'on_hold', title: 'Ждёт клиента', desc: 'На паузе: данные / созвон', accent: 'from-rose-500/20 to-rose-600/10' }
 ];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ 

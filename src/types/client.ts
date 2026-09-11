@@ -1,5 +1,13 @@
 export type ClientStatus = 'lead' | 'active' | 'regular' | 'vip' | 'dormant';
 
+export type PipelineStage = 
+  | 'new_lead'         // Новый контакт
+  | 'contact_call'     // Квалификация / Созвон
+  | 'negotiation'      // Переговоры / КП
+  | 'awaiting_payment' // Счёт / Ожидает аванс
+  | 'deal_won'         // Сделка закрыта (Запуск проекта)
+  | 'deal_lost';       // Отказ / Архив
+
 export interface Client {
   id: string;
   name: string;
@@ -10,6 +18,8 @@ export interface Client {
   email?: string;
   website?: string;
   status: ClientStatus;
+  pipelineStage?: PipelineStage;
+  dealValue?: number; // Потенциальный бюджет сделки в рублях
   notes?: string;
   tags?: string[];
   nextFollowUp?: string; // YYYY-MM-DD

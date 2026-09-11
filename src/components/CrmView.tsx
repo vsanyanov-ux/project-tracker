@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import type { Client, ClientStatus, ClientSortBy } from '../types/client';
+import type { Client, ClientStatus, ClientSortBy, PipelineStage } from '../types/client';
 import type { Project } from '../types/project';
 import { calculateClientStats } from '../utils/clientStorage';
 import { formatCurrency } from '../utils/formatters';
+import { CrmPipelineBoard } from './CrmPipelineBoard';
 import {
   Users,
   UserPlus,
@@ -23,18 +24,21 @@ import {
   FolderGit2,
   ArrowUpDown,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  Kanban,
+  LayoutGrid
 } from 'lucide-react';
 
 interface CrmViewProps {
   clients: Client[];
   projects: Project[];
-  onOpenNewClient: () => void;
+  onOpenNewClient: (initialStage?: PipelineStage) => void;
   onEditClient: (client: Client) => void;
   onDeleteClient: (clientId: string) => void;
   onCreateProjectForClient: (client: Client) => void;
   onOpenProjectDetail: (projectId: string) => void;
   onSyncFromProjects: () => void;
+  onUpdateClientStage: (clientId: string, newStage: PipelineStage) => void;
   externalSearch?: string;
 }
 
@@ -64,8 +68,24 @@ export function CrmView({
   onCreateProjectForClient,
   onOpenProjectDetail,
   onSyncFromProjects,
+  onUpdateClientStage,
   externalSearch = ''
 }: CrmViewProps) {
+  const [crmSubView, setCrmSubView] = useState<'pipeline' | 'grid'>(() => {
+    try {
+      const saved = localStorage.getItem('antigravity_crm_subview_v1');
+      if (saved === 'pipeline' || saved === 'grid') return saved;
+    } catch {}
+    return 'pipeline';
+  });
+
+  const handleSubViewChange = (mode: 'pipeline' | 'grid') => {
+    setCrmSubView(mode);
+    try {
+      localStorage.setItem('antigravity_crm_subview_v1', mode);
+    } catch {}
+  };
+
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<ClientSortBy>('ltv');
 
@@ -371,23 +391,53 @@ export function CrmView({
           </button>
         </div>
 
-        {/* Right side: Sorting, Sync & New Client */}
+        {/* Right side: View Mode Switcher, Sorting, Sync & New Client */}
         <div className="flex items-center gap-2.5 flex-wrap justify-end">
-          {/* Sorting */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/60 p-1 rounded-xl border border-white/5">
-            <ArrowUpDown className="w-3.5 h-3.5 ml-1 text-slate-500" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as ClientSortBy)}
-              className="bg-transparent text-slate-200 text-xs py-1 pr-2 outline-none cursor-pointer"
+          {/* View Mode Toggle: Pipeline vs Grid */}
+          <div className="glass-panel p-1 rounded-xl flex items-center border border-white/5 bg-slate-900/60">
+            <button
+              onClick={() => handleSubViewChange('pipeline')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                crmSubView === 'pipeline'
+                  ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Интерактивная канбан-воронка лидов и сделок"
             >
-              <option value="ltv" className="bg-slate-900">По LTV (доходу)</option>
-              <option value="followUp" className="bg-slate-900">По дате касания</option>
-              <option value="projects" className="bg-slate-900">По числу проектов</option>
-              <option value="name" className="bg-slate-900">По имени А-Я</option>
-              <option value="updatedAt" className="bg-slate-900">По активности</option>
-            </select>
+              <Kanban className="w-3.5 h-3.5" />
+              <span>Воронка продаж</span>
+            </button>
+            <button
+              onClick={() => handleSubViewChange('grid')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                crmSubView === 'grid'
+                  ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="База клиентов (Сетка карточек)"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Карточки</span>
+            </button>
           </div>
+
+          {/* Sorting (available in grid mode) */}
+          {crmSubView === 'grid' && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/60 p-1 rounded-xl border border-white/5">
+              <ArrowUpDown className="w-3.5 h-3.5 ml-1 text-slate-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as ClientSortBy)}
+                className="bg-transparent text-slate-200 text-xs py-1 pr-2 outline-none cursor-pointer"
+              >
+                <option value="ltv" className="bg-slate-900">По LTV (доходу)</option>
+                <option value="followUp" className="bg-slate-900">По дате касания</option>
+                <option value="projects" className="bg-slate-900">По числу проектов</option>
+                <option value="name" className="bg-slate-900">По имени А-Я</option>
+                <option value="updatedAt" className="bg-slate-900">По активности</option>
+              </select>
+            </div>
+          )}
 
           {/* Sync Button */}
           <button
@@ -401,7 +451,7 @@ export function CrmView({
 
           {/* Add Client Button */}
           <button
-            onClick={onOpenNewClient}
+            onClick={() => onOpenNewClient()}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
@@ -410,8 +460,17 @@ export function CrmView({
         </div>
       </div>
 
-      {/* Grid of Client Cards */}
-      {filteredClients.length === 0 ? (
+      {/* Main Content Area: Pipeline vs Grid */}
+      {crmSubView === 'pipeline' ? (
+        <CrmPipelineBoard
+          clients={filteredClients.map((fc) => fc.client)}
+          onUpdateClientStage={onUpdateClientStage}
+          onEditClient={onEditClient}
+          onDeleteClient={onDeleteClient}
+          onCreateProjectForClient={onCreateProjectForClient}
+          onAddNewClientInStage={(stage) => onOpenNewClient(stage)}
+        />
+      ) : filteredClients.length === 0 ? (
         <div className="glass-panel rounded-3xl p-12 text-center border border-white/10 max-w-xl mx-auto my-12 shadow-2xl">
           <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto mb-4 text-indigo-400">
             <Users className="w-8 h-8" />
@@ -424,7 +483,7 @@ export function CrmView({
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <button
-              onClick={onOpenNewClient}
+              onClick={() => onOpenNewClient()}
               className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
               + Добавить клиента

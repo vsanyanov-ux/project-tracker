@@ -213,7 +213,7 @@ export const STATUS_CONFIG: Record<ProjectStatus, { label: string; bg: string; t
     glow: 'rgba(16, 185, 129, 0.4)'
   },
   on_hold: {
-    label: 'На паузе',
+    label: 'Ждёт клиента / На паузе',
     bg: 'bg-rose-500/20',
     text: 'text-rose-400',
     border: 'border-rose-500/40',

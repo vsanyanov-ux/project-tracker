@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Project, ProjectStatus, FilterOptions, ViewMode, MainTab } from './types/project';
-import type { Client } from './types/client';
+import type { Client, PipelineStage } from './types/client';
 import { DEFAULT_CATEGORIES } from './types/project';
 import { getStoredProjects, saveProjects, resetToDefaultProjects, exportProjectsToJson, importProjectsFromJson } from './utils/storage';
 import { getStoredClients, saveClients, seedClientsFromProjects } from './utils/clientStorage';
@@ -22,7 +22,24 @@ import confetti from 'canvas-confetti';
 export function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [currentTab, setCurrentTab] = useState<MainTab>('active');
+  const [currentTab, setCurrentTab] = useState<MainTab>(() => {
+    try {
+      const saved = localStorage.getItem('antigravity_current_tab_v2');
+      if (saved === 'clients' || saved === 'active' || saved === 'archive') {
+        return saved;
+      }
+    } catch {}
+    return 'clients';
+  });
+
+  const handleTabChange = (tab: MainTab) => {
+    setCurrentTab(tab);
+    try {
+      localStorage.setItem('antigravity_current_tab_v2', tab);
+    } catch {}
+  };
+
+  const [clientInitialStage, setClientInitialStage] = useState<PipelineStage | undefined>(undefined);
   const [viewMode, setViewModeState] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('antigravity_view_mode_v1');
@@ -210,6 +227,53 @@ export function App() {
     setProjects(updatedList);
     saveProjects(updatedList);
     setEditingProject(null);
+
+    // If project was launched for a client, mark them active/won and switch to active tab
+    if (prefilledClientForProject) {
+      const updatedClients = clients.map((c) => {
+        if (c.id === prefilledClientForProject.id) {
+          return {
+            ...c,
+            status: 'active' as const,
+            pipelineStage: 'deal_won' as const,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return c;
+      });
+      setClients(updatedClients);
+      saveClients(updatedClients);
+      setPrefilledClientForProject(null);
+      handleTabChange('active');
+    }
+  };
+
+  const handleUpdateClientStage = (clientId: string, newStage: PipelineStage) => {
+    const updatedList = clients.map((c) => {
+      if (c.id === clientId) {
+        let newStatus = c.status;
+        if (newStage === 'deal_won') newStatus = 'active';
+        else if (newStage === 'deal_lost') newStatus = 'dormant';
+        else if (c.status !== 'vip' && c.status !== 'regular') newStatus = 'lead';
+
+        return {
+          ...c,
+          pipelineStage: newStage,
+          status: newStatus,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return c;
+    });
+    setClients(updatedList);
+    saveClients(updatedList);
+    showToast('Стадия сделки в воронке обновлена');
+  };
+
+  const handleOpenNewClient = (stage?: PipelineStage) => {
+    setEditingClient(null);
+    setClientInitialStage(stage);
+    setIsClientModalOpen(true);
   };
 
   const handleDeleteProject = (projectId: string) => {
@@ -356,16 +420,13 @@ export function App() {
             setPrefilledClientForProject(null);
             setIsFormModalOpen(true);
           }}
-          onOpenNewClient={() => {
-            setEditingClient(null);
-            setIsClientModalOpen(true);
-          }}
+          onOpenNewClient={() => handleOpenNewClient()}
           onExportData={handleExportData}
           onImportData={handleImportData}
           onResetData={handleResetData}
           categories={categories}
           currentTab={currentTab}
-          onTabChange={setCurrentTab}
+          onTabChange={handleTabChange}
           activeCount={activeCount}
           archiveCount={archiveCount}
           clientsCount={clients.length}
@@ -382,7 +443,7 @@ export function App() {
             onRestoreProject={handleRestoreFromArchive}
             onUpdateStatus={handleQuickStatusChange}
             onGoToActive={() => {
-              setCurrentTab('active');
+              handleTabChange('active');
               handleFilterChange({ status: 'all' });
             }}
           />
@@ -391,10 +452,7 @@ export function App() {
           <CrmView
             clients={clients}
             projects={projects}
-            onOpenNewClient={() => {
-              setEditingClient(null);
-              setIsClientModalOpen(true);
-            }}
+            onOpenNewClient={handleOpenNewClient}
             onEditClient={(c) => {
               setEditingClient(c);
               setIsClientModalOpen(true);
@@ -403,6 +461,7 @@ export function App() {
             onCreateProjectForClient={handleCreateProjectForClient}
             onOpenProjectDetail={(id) => setSelectedProjectId(id)}
             onSyncFromProjects={handleSyncClientsFromProjects}
+            onUpdateClientStage={handleUpdateClientStage}
             externalSearch={filters.search}
           />
         ) : (
@@ -527,9 +586,11 @@ export function App() {
         onClose={() => {
           setIsClientModalOpen(false);
           setEditingClient(null);
+          setClientInitialStage(undefined);
         }}
         onSave={handleSaveClient}
         clientToEdit={editingClient}
+        initialStage={clientInitialStage}
       />
 
       {/* Floating Toast Notification */}
