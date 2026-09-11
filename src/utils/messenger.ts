@@ -22,6 +22,83 @@ export const getWhatsAppUrl = (phone?: string): string | undefined => {
 };
 
 /**
+ * Формирует прямую валидную ссылку для перехода в Telegram чат/канал/профиль (https://t.me/...).
+ * Корректно очищает любые форматы ввода и защищает от ошибочных дублей:
+ * - '@username' -> 'https://t.me/username'
+ * - 't.me/username' -> 'https://t.me/username'
+ * - 'https://t.me/username' -> 'https://t.me/username'
+ * - 'https://t.me/t.me/username' -> 'https://t.me/username' (защита от зацикливания на telegram.org)
+ * - 'telegram.me/username' -> 'https://t.me/username'
+ * - '+79991234567' -> 'https://t.me/+79991234567'
+ * - 't.me/+join_hash' -> 'https://t.me/+join_hash'
+ */
+export const getTelegramUrl = (tg?: string): string | undefined => {
+  if (!tg) return undefined;
+  let clean = tg.trim();
+  if (!clean) return undefined;
+
+  // Если это системный URI схемы tg://
+  if (clean.startsWith('tg://resolve?domain=')) {
+    clean = clean.replace('tg://resolve?domain=', '');
+  } else if (clean.startsWith('tg://')) {
+    return clean;
+  }
+
+  // Убираем протокол http/https и www
+  clean = clean.replace(/^https?:\/\//i, '');
+  clean = clean.replace(/^www\./i, '');
+
+  // Циклически вычищаем любые дубли доменов t.me, telegram.me, telegram.org
+  while (/^(t\.me|telegram\.me|telegram\.org)\//i.test(clean)) {
+    clean = clean.replace(/^(t\.me|telegram\.me|telegram\.org)\//i, '');
+  }
+
+  // Убираем ведущие @ или слеши (но сохраняем ведущий + для инвайт-ссылок или телефонов)
+  clean = clean.replace(/^[@/]+/, '').replace(/\/+$/, '');
+
+  // Если строка пустая или остался просто "telegram", ссылка некорректна
+  if (!clean || clean.toLowerCase() === 'telegram') return undefined;
+
+  return `https://t.me/${clean}`;
+};
+
+/**
+ * Форматирует отображение никнейма Telegram (@username)
+ */
+export const formatTelegramHandle = (tg?: string): string => {
+  if (!tg) return '';
+  let clean = tg.trim();
+  if (!clean) return '';
+
+  clean = clean.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+  while (/^(t\.me|telegram\.me|telegram\.org)\//i.test(clean)) {
+    clean = clean.replace(/^(t\.me|telegram\.me|telegram\.org)\//i, '');
+  }
+  clean = clean.replace(/^[@/]+/, '').replace(/\/+$/, '');
+
+  if (!clean) return tg;
+  if (clean.startsWith('+')) return clean;
+  return `@${clean}`;
+};
+
+/**
+ * Универсальный резолвер ссылки по контакту клиента (Telegram, Email, Телефон)
+ */
+export const getContactUrl = (contact?: string): string | undefined => {
+  if (!contact) return undefined;
+  const trimmed = contact.trim();
+  if (!trimmed) return undefined;
+
+  if (trimmed.includes('@') && !trimmed.startsWith('@') && !trimmed.includes('/')) {
+    return `mailto:${trimmed}`;
+  }
+  if (/^(\+?\d[\d\s\-()]{6,}\d)$/.test(trimmed)) {
+    return `tel:${cleanPhoneForMessenger(trimmed)}`;
+  }
+  return getTelegramUrl(trimmed);
+};
+
+/**
  * Проверяет, является ли значение прямой ссылкой на профиль в МАКС (max.ru/u/...)
  */
 export const isMaxProfileUrl = (val?: string): boolean => {

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Client, ClientStatus, PipelineStage } from '../types/client';
-import { X, Users, MessageSquare, Phone, Mail, Globe, Building2, Calendar, Tag, DollarSign, Layers, RefreshCw } from 'lucide-react';
+import { X, Users, MessageSquare, Phone, Mail, Globe, Building2, Calendar, Tag, DollarSign, Layers, RefreshCw, Sparkles } from 'lucide-react';
 import { WhatsAppIcon, MaxIcon } from './MessengerIcons';
 
 interface ClientFormModalProps {
@@ -9,6 +9,7 @@ interface ClientFormModalProps {
   onSave: (client: Client) => void;
   clientToEdit?: Client | null;
   initialStage?: PipelineStage;
+  existingClients?: Client[];
 }
 
 const STATUS_CONFIG: { value: ClientStatus; label: string; icon: string; color: string }[] = [
@@ -24,11 +25,11 @@ const PIPELINE_STAGE_CONFIG: { value: PipelineStage; label: string; icon: string
   { value: 'contact_call', label: 'Созвон / Бриф', icon: '📞' },
   { value: 'negotiation', label: 'Переговоры / КП', icon: '🤝' },
   { value: 'awaiting_payment', label: 'Счёт / Аванс', icon: '💳' },
-  { value: 'deal_won', label: 'Сделка закрыта', icon: '🏆' },
+  { value: 'deal_won', label: 'Успешно закрыта', icon: '🏆' },
   { value: 'deal_lost', label: 'Отказ / Архив', icon: '❌' },
 ];
 
-export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initialStage }: ClientFormModalProps) {
+export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initialStage, existingClients }: ClientFormModalProps) {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -44,6 +45,38 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
   const [nextFollowUp, setNextFollowUp] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Quick picker & base client selection state
+  const [selectedBaseClientId, setSelectedBaseClientId] = useState<string>('');
+  const [updateExistingFromBase, setUpdateExistingFromBase] = useState(true);
+
+  // Extract unique lists from existing clients for suggestions & datalists
+  const existingNames = useMemo(() => {
+    if (!existingClients) return [];
+    const set = new Set<string>();
+    existingClients.forEach((c) => {
+      if (c.name?.trim()) set.add(c.name.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [existingClients]);
+
+  const existingCompanies = useMemo(() => {
+    if (!existingClients) return [];
+    const set = new Set<string>();
+    existingClients.forEach((c) => {
+      if (c.company?.trim()) set.add(c.company.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [existingClients]);
+
+  const existingLpr = useMemo(() => {
+    if (!existingClients) return [];
+    const set = new Set<string>();
+    existingClients.forEach((c) => {
+      if (c.contactPerson?.trim()) set.add(c.contactPerson.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [existingClients]);
 
   useEffect(() => {
     if (clientToEdit) {
@@ -62,6 +95,8 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
       setNextFollowUp(clientToEdit.nextFollowUp || '');
       setTagsInput((clientToEdit.tags || []).join(', '));
       setNotes(clientToEdit.notes || '');
+      setSelectedBaseClientId(clientToEdit.id);
+      setUpdateExistingFromBase(true);
     } else {
       setName('');
       setCompany('');
@@ -78,8 +113,118 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
       setNextFollowUp('');
       setTagsInput('');
       setNotes('');
+      setSelectedBaseClientId('');
+      setUpdateExistingFromBase(true);
     }
   }, [clientToEdit, isOpen, initialStage]);
+
+  // Autofill client data from existing client in base
+  const applyClientData = (c: Client) => {
+    setName(c.name || '');
+    setCompany(c.company || '');
+    setContactPerson(c.contactPerson || '');
+    setTelegram(c.telegram || '');
+    setPhone(c.phone || '');
+    setWhatsapp(c.whatsapp || c.phone || '');
+    setMax(c.max || c.phone || '');
+    setEmail(c.email || '');
+    setWebsite(c.website || '');
+    if (!clientToEdit) {
+      if (c.status) setStatus(c.status);
+      if (c.pipelineStage && !initialStage) setPipelineStage(c.pipelineStage);
+    }
+    if (c.dealValue) setDealValue(c.dealValue.toString());
+    if (c.tags && c.tags.length > 0) setTagsInput(c.tags.join(', '));
+    if (c.notes) setNotes(c.notes);
+    if (c.nextFollowUp) setNextFollowUp(c.nextFollowUp);
+    setSelectedBaseClientId(c.id);
+  };
+
+  const handleSelectFromBase = (clientId: string) => {
+    if (!clientId) {
+      setSelectedBaseClientId('');
+      return;
+    }
+    const found = (existingClients || []).find((c) => c.id === clientId);
+    if (found) {
+      applyClientData(found);
+    }
+  };
+
+  // Smart change handlers supporting arbitrary input and datalist auto-matching
+  const handleNameChange = (val: string) => {
+    setName(val);
+    const match = (existingClients || []).find(
+      (c) => c.name.trim().toLowerCase() === val.trim().toLowerCase()
+    );
+    if (match) {
+      if (!company && match.company) setCompany(match.company);
+      if (!contactPerson && match.contactPerson) setContactPerson(match.contactPerson);
+      if (!telegram && match.telegram) setTelegram(match.telegram);
+      if (!phone && match.phone) {
+        setPhone(match.phone);
+        if (!whatsapp) setWhatsapp(match.whatsapp || match.phone);
+        if (!max) setMax(match.max || match.phone);
+      }
+      if (!email && match.email) setEmail(match.email);
+      if (!website && match.website) setWebsite(match.website);
+      if (!dealValue && match.dealValue) setDealValue(match.dealValue.toString());
+      if (!tagsInput && match.tags && match.tags.length > 0) setTagsInput(match.tags.join(', '));
+      if (!notes && match.notes) setNotes(match.notes);
+    }
+  };
+
+  const handleCompanyChange = (val: string) => {
+    setCompany(val);
+    const match = (existingClients || []).find(
+      (c) => c.company?.trim().toLowerCase() === val.trim().toLowerCase()
+    );
+    if (match) {
+      if (!name && match.name) setName(match.name);
+      if (!contactPerson && match.contactPerson) setContactPerson(match.contactPerson);
+      if (!telegram && match.telegram) setTelegram(match.telegram);
+      if (!phone && match.phone) {
+        setPhone(match.phone);
+        if (!whatsapp) setWhatsapp(match.whatsapp || match.phone);
+        if (!max) setMax(match.max || match.phone);
+      }
+      if (!email && match.email) setEmail(match.email);
+    }
+  };
+
+  const handleContactPersonChange = (val: string) => {
+    setContactPerson(val);
+    const match = (existingClients || []).find(
+      (c) => c.contactPerson?.trim().toLowerCase() === val.trim().toLowerCase()
+    );
+    if (match) {
+      if (!name && match.name) setName(match.name);
+      if (!company && match.company) setCompany(match.company);
+      if (!telegram && match.telegram) setTelegram(match.telegram);
+      if (!phone && match.phone) {
+        setPhone(match.phone);
+        if (!whatsapp) setWhatsapp(match.whatsapp || match.phone);
+        if (!max) setMax(match.max || match.phone);
+      }
+    }
+  };
+
+  // Find if current typed inputs match an existing client in database
+  const matchedClient = useMemo(() => {
+    if (!existingClients || (!name.trim() && !company.trim() && !contactPerson.trim())) return null;
+    const n = name.trim().toLowerCase();
+    const comp = company.trim().toLowerCase();
+    const lpr = contactPerson.trim().toLowerCase();
+    return (
+      existingClients.find(
+        (c) =>
+          c.id !== clientToEdit?.id &&
+          ((n && c.name.toLowerCase() === n) ||
+            (comp && c.company && c.company.toLowerCase() === comp) ||
+            (lpr && c.contactPerson && c.contactPerson.toLowerCase() === lpr))
+      ) || null
+    );
+  }, [existingClients, name, company, contactPerson, clientToEdit]);
 
   // Handle phone change with reactive auto-population of WhatsApp and MAX
   const handlePhoneChange = (newPhone: string) => {
@@ -124,8 +269,17 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
 
     const parsedDeal = parseFloat(dealValue.replace(/\s+/g, ''));
 
+    let targetId: string;
+    if (clientToEdit) {
+      targetId = clientToEdit.id;
+    } else if (selectedBaseClientId && updateExistingFromBase) {
+      targetId = selectedBaseClientId;
+    } else {
+      targetId = 'client-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    }
+
     const clientData: Client = {
-      id: clientToEdit ? clientToEdit.id : 'client-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      id: targetId,
       name: name.trim(),
       company: company.trim() || undefined,
       contactPerson: contactPerson.trim() || undefined,
@@ -182,19 +336,120 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+          {/* Quick Select from Existing Clients in Base */}
+          {existingClients && existingClients.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Выбрать из текущей базы клиентов</span>
+                </label>
+                {selectedBaseClientId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBaseClientId('');
+                      if (!clientToEdit) {
+                        setName('');
+                        setCompany('');
+                        setContactPerson('');
+                        setTelegram('');
+                        setPhone('');
+                        setWhatsapp('');
+                        setMax('');
+                        setEmail('');
+                        setWebsite('');
+                        setDealValue('');
+                        setNotes('');
+                        setTagsInput('');
+                      }
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Очистить / Сбросить
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedBaseClientId}
+                  onChange={(e) => handleSelectFromBase(e.target.value)}
+                  className="w-full glass-input px-3.5 py-2 rounded-xl text-xs text-white bg-slate-900/90 border-indigo-500/30 cursor-pointer"
+                >
+                  <option value="" className="bg-slate-900 text-slate-400">
+                    -- Ввести произвольно или выберите клиента из базы ({existingClients.length}) --
+                  </option>
+                  {existingClients.map((c) => {
+                    const extra = [c.company, c.contactPerson ? `ЛПР: ${c.contactPerson}` : '']
+                      .filter(Boolean)
+                      .join(' • ');
+                    return (
+                      <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                        {c.name} {extra ? `(${extra})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {selectedBaseClientId && !clientToEdit && (
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-indigo-300/80">
+                  <input
+                    type="checkbox"
+                    id="update-base-client"
+                    checked={updateExistingFromBase}
+                    onChange={(e) => setUpdateExistingFromBase(e.target.checked)}
+                    className="rounded border-white/20 text-indigo-500 focus:ring-0 cursor-pointer"
+                  />
+                  <label htmlFor="update-base-client" className="cursor-pointer">
+                    Обновить карточку этого клиента в воронке (иначе создать отдельную копию)
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Matched Client Suggestion Badge */}
+          {matchedClient && matchedClient.id !== selectedBaseClientId && (
+            <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-xs text-indigo-300 animate-fade-in">
+              <div className="flex items-center gap-2 truncate">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="truncate">
+                  Найден в базе: <strong>{matchedClient.name}</strong>
+                  {matchedClient.company ? ` • ${matchedClient.company}` : ''}
+                  {matchedClient.contactPerson ? ` • ЛПР: ${matchedClient.contactPerson}` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => applyClientData(matchedClient)}
+                className="ml-2 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[11px] shrink-0 transition-all cursor-pointer shadow-sm"
+              >
+                Подставить данные
+              </button>
+            </div>
+          )}
+
           {/* Main Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Имя / Компания <span className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Имя / Клиент <span className="text-rose-400">*</span>
+                </label>
+                {existingNames.length > 0 && (
+                  <span className="text-[10px] text-slate-500">из базы или произвольно</span>
+                )}
+              </div>
               <div className="relative">
                 <Building2 className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   required
+                  list="crm-client-names-list"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="ИП Гладкая, ООО Вектор, Алексей..."
                   className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-sm"
                 />
@@ -202,13 +457,19 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Организация / Бренд (если есть)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Организация / Компания
+                </label>
+                {existingCompanies.length > 0 && (
+                  <span className="text-[10px] text-slate-500">из базы или произвольно</span>
+                )}
+              </div>
               <input
                 type="text"
+                list="crm-client-companies-list"
                 value={company}
-                onChange={(e) => setCompany(e.target.value)}
+                onChange={(e) => handleCompanyChange(e.target.value)}
                 placeholder="Например: Салон красоты, IT стартап"
                 className="w-full glass-input px-4 py-2.5 rounded-xl text-sm"
               />
@@ -218,13 +479,19 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
           {/* Contact Person & Telegram */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Контактное лицо / ЛПР
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Контактное лицо / ЛПР
+                </label>
+                {existingLpr.length > 0 && (
+                  <span className="text-[10px] text-slate-500">из базы или произвольно</span>
+                )}
+              </div>
               <input
                 type="text"
+                list="crm-client-lpr-list"
                 value={contactPerson}
-                onChange={(e) => setContactPerson(e.target.value)}
+                onChange={(e) => handleContactPersonChange(e.target.value)}
                 placeholder="Татьяна (директор), Михаил"
                 className="w-full glass-input px-4 py-2.5 rounded-xl text-sm"
               />
@@ -482,6 +749,29 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
               className="w-full glass-input p-3.5 rounded-xl text-sm resize-y"
             />
           </div>
+
+          {/* Datalists for selecting from current client database or typing arbitrarily */}
+          {existingClients && existingClients.length > 0 && (
+            <>
+              <datalist id="crm-client-names-list">
+                {existingNames.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+
+              <datalist id="crm-client-companies-list">
+                {existingCompanies.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+
+              <datalist id="crm-client-lpr-list">
+                {existingLpr.map((lpr) => (
+                  <option key={lpr} value={lpr} />
+                ))}
+              </datalist>
+            </>
+          )}
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">

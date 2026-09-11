@@ -116,8 +116,12 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
   const handleClientChange = (name: string) => {
     setClient(name);
     if (existingClients && name.trim()) {
+      const q = name.trim().toLowerCase();
       const match = existingClients.find(
-        (c) => c.name.toLowerCase() === name.trim().toLowerCase()
+        (c) =>
+          c.name.toLowerCase() === q ||
+          (c.company && c.company.toLowerCase() === q) ||
+          (c.contactPerson && c.contactPerson.toLowerCase() === q)
       );
       if (match && !clientContact) {
         const contact = match.telegram || match.phone || match.email || '';
@@ -356,25 +360,45 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
           {/* Client & Contact */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1.5">
-                Клиент / Заказчик *
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-slate-300 font-semibold">
+                  Клиент / Заказчик *
+                </label>
+                {existingClients && existingClients.length > 0 && (
+                  <span className="text-[10px] text-slate-500">из базы или произвольно</span>
+                )}
+              </div>
               <input
                 type="text"
                 required
                 list="crm-clients-list"
                 value={client}
                 onChange={(e) => handleClientChange(e.target.value)}
-                placeholder="Ольга Потапова / Соломастер"
+                placeholder="Ольга Потапова, ООО Вектор, Михаил..."
                 className="w-full glass-input px-4 py-2.5 rounded-xl"
               />
               {existingClients && existingClients.length > 0 && (
                 <datalist id="crm-clients-list">
-                  {existingClients.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.company && c.company !== c.name ? `${c.company} (${c.name})` : c.name}
-                    </option>
-                  ))}
+                  {existingClients.map((c) => {
+                    const extra = [c.company, c.contactPerson ? `ЛПР: ${c.contactPerson}` : ''].filter(Boolean).join(' • ');
+                    return (
+                      <React.Fragment key={c.id}>
+                        <option value={c.name}>
+                          {extra ? `${c.name} (${extra})` : c.name}
+                        </option>
+                        {c.company && c.company !== c.name && (
+                          <option value={c.company}>
+                            {c.company} (Компания • Клиент: {c.name})
+                          </option>
+                        )}
+                        {c.contactPerson && (
+                          <option value={c.contactPerson}>
+                            {c.contactPerson} (ЛПР • Клиент: {c.name})
+                          </option>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </datalist>
               )}
             </div>

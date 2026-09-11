@@ -5,7 +5,7 @@ export type PipelineStage =
   | 'contact_call'     // Квалификация / Созвон
   | 'negotiation'      // Переговоры / КП
   | 'awaiting_payment' // Счёт / Ожидает аванс
-  | 'deal_won'         // Сделка закрыта (Запуск проекта)
+  | 'deal_won'         // Успешно закрыта (Победа)
   | 'deal_lost';       // Отказ / Архив
 
 export interface Client {

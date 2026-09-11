@@ -591,6 +591,7 @@ export function App() {
         onSave={handleSaveClient}
         clientToEdit={editingClient}
         initialStage={clientInitialStage}
+        existingClients={clients}
       />
 
       {/* Floating Toast Notification */}

@@ -10,6 +10,7 @@ import {
   PRIORITY_CONFIG,
   COLOR_THEME_GRADIENTS 
 } from '../utils/formatters';
+import { getContactUrl, formatTelegramHandle } from '../utils/messenger';
 import { 
   Calendar, 
   CheckSquare, 
@@ -21,7 +22,8 @@ import {
   CheckCircle2,
   AlertCircle,
   RotateCcw,
-  Archive
+  Archive,
+  Send
 } from 'lucide-react';
 
 interface ProjectCardProps {
@@ -95,11 +97,28 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
             <User className="w-3.5 h-3.5 text-slate-500" />
             <span className="truncate">{project.client}</span>
-            {project.clientContact && (
-              <span className="text-[11px] text-indigo-400/80 bg-indigo-950/40 px-1.5 py-0.2 rounded border border-indigo-800/30">
-                {project.clientContact}
-              </span>
-            )}
+            {project.clientContact && (() => {
+              const contactUrl = getContactUrl(project.clientContact);
+              const isMail = contactUrl?.startsWith('mailto:');
+              const isPhone = contactUrl?.startsWith('tel:');
+              return (
+                <a
+                  href={contactUrl || '#'}
+                  target={contactUrl && !isMail && !isPhone ? '_blank' : undefined}
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (contactUrl) {
+                      e.stopPropagation();
+                    }
+                  }}
+                  title={isMail ? 'Написать на email' : isPhone ? 'Позвонить' : 'Написать в Telegram'}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-200 bg-indigo-950/50 hover:bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-800/40 hover:border-indigo-600/50 transition-colors flex items-center gap-1 cursor-pointer truncate max-w-[150px]"
+                >
+                  <Send className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">{formatTelegramHandle(project.clientContact)}</span>
+                </a>
+              );
+            })()}
           </div>
         </div>
 

@@ -10,6 +10,7 @@ import {
   STATUS_CONFIG, 
   COLOR_THEME_GRADIENTS 
 } from '../utils/formatters';
+import { getContactUrl, formatTelegramHandle } from '../utils/messenger';
 import { 
   X, 
   Calendar, 
@@ -360,17 +361,23 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 <User className="w-3.5 h-3.5 text-slate-500" />
                 <span>Заказчик: <strong className="text-slate-200">{project.client}</strong></span>
               </div>
-              {project.clientContact && (
-                <a 
-                  href={project.clientContact.startsWith('@') ? `https://t.me/${project.clientContact.replace('@', '')}` : (project.clientContact.startsWith('t.me') ? `https://${project.clientContact}` : undefined)}
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/40"
-                >
-                  <Send className="w-3 h-3" />
-                  {project.clientContact}
-                </a>
-              )}
+              {project.clientContact && (() => {
+                const contactUrl = getContactUrl(project.clientContact);
+                const isMail = contactUrl?.startsWith('mailto:');
+                const isPhone = contactUrl?.startsWith('tel:');
+                return (
+                  <a 
+                    href={contactUrl}
+                    target={contactUrl && !isMail && !isPhone ? "_blank" : undefined}
+                    rel="noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/40"
+                    title={isMail ? "Написать на email" : isPhone ? "Позвонить" : "Открыть чат в Telegram"}
+                  >
+                    <Send className="w-3 h-3" />
+                    {formatTelegramHandle(project.clientContact)}
+                  </a>
+                );
+              })()}
             </div>
           </div>
 

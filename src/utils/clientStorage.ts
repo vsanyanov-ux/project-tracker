@@ -1,5 +1,6 @@
 import type { Client, ClientStats, ClientStatus } from '../types/client';
 import type { Project } from '../types/project';
+import { formatTelegramHandle } from './messenger';
 
 const CLIENTS_STORAGE_KEY = 'antigravity_clients_data_v1';
 
@@ -101,13 +102,13 @@ export const seedClientsFromProjects = (projects: Project[], existingClients: Cl
 
     const contact = (p.clientContact || '').trim();
     if (contact.startsWith('@') || contact.includes('t.me/')) {
-      telegram = contact;
+      telegram = formatTelegramHandle(contact);
     } else if (contact.includes('@')) {
       email = contact;
     } else if (/[\d+]{7,}/.test(contact)) {
       phone = contact;
     } else if (contact) {
-      telegram = contact;
+      telegram = formatTelegramHandle(contact);
     }
 
     // Determine status

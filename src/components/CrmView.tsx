@@ -3,6 +3,7 @@ import type { Client, ClientStatus, ClientSortBy, PipelineStage } from '../types
 import type { Project } from '../types/project';
 import { calculateClientStats } from '../utils/clientStorage';
 import { formatCurrency } from '../utils/formatters';
+import { getTelegramUrl, formatTelegramHandle } from '../utils/messenger';
 import { CrmPipelineBoard } from './CrmPipelineBoard';
 import { ClientPhoneContact } from './ClientPhoneContact';
 import {
@@ -187,13 +188,6 @@ export function CrmView({
         return (b.client.updatedAt || '').localeCompare(a.client.updatedAt || '');
       });
   }, [clientsWithStats, selectedStatus, effectiveSearch, sortBy]);
-
-  // Helper for telegram links
-  const getTelegramUrl = (tg?: string) => {
-    if (!tg) return undefined;
-    const clean = tg.replace('@', '').replace('https://t.me/', '').trim();
-    return `https://t.me/${clean}`;
-  };
 
   // Helper for initials
   const getInitials = (name: string) => {
@@ -466,11 +460,13 @@ export function CrmView({
       {crmSubView === 'pipeline' ? (
         <CrmPipelineBoard
           clients={filteredClients.map((fc) => fc.client)}
+          projects={projects}
           onUpdateClientStage={onUpdateClientStage}
           onEditClient={onEditClient}
           onDeleteClient={onDeleteClient}
           onCreateProjectForClient={onCreateProjectForClient}
           onAddNewClientInStage={(stage) => onOpenNewClient(stage)}
+          onOpenProjectDetail={onOpenProjectDetail}
         />
       ) : filteredClients.length === 0 ? (
         <div className="glass-panel rounded-3xl p-12 text-center border border-white/10 max-w-xl mx-auto my-12 shadow-2xl">
@@ -597,7 +593,7 @@ export function CrmView({
                             rel="noopener noreferrer"
                             className="text-cyan-400 hover:text-cyan-300 hover:underline truncate"
                           >
-                            {c.telegram}
+                            {formatTelegramHandle(c.telegram)}
                           </a>
                         ) : (
                           <span className="truncate">{c.telegram}</span>

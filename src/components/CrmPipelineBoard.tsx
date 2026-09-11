@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { Client, PipelineStage } from '../types/client';
+import type { Project } from '../types/project';
 import { formatCurrency } from '../utils/formatters';
+import { getTelegramUrl, formatTelegramHandle } from '../utils/messenger';
 import { ClientPhoneContact } from './ClientPhoneContact';
 import { 
   ChevronLeft, 
@@ -9,6 +11,7 @@ import {
   GripVertical, 
   MessageSquare, 
   Rocket, 
+  FolderKanban,
   Edit2, 
   Trash2,
   Clock,
@@ -17,11 +20,13 @@ import {
 
 interface CrmPipelineBoardProps {
   clients: Client[];
+  projects?: Project[];
   onUpdateClientStage: (clientId: string, newStage: PipelineStage) => void;
   onEditClient: (client: Client) => void;
   onDeleteClient: (clientId: string) => void;
   onCreateProjectForClient: (client: Client) => void;
   onAddNewClientInStage: (stage: PipelineStage) => void;
+  onOpenProjectDetail?: (id: string) => void;
 }
 
 interface StageColumnDef {
@@ -73,9 +78,9 @@ const PIPELINE_STAGES: StageColumnDef[] = [
   },
   {
     stage: 'deal_won',
-    title: 'Сделка закрыта / Старт',
+    title: 'Успешно закрыта',
     icon: '🏆',
-    desc: 'Успех! Запустить проект',
+    desc: 'Оплата получена / Победа',
     gradient: 'from-emerald-500/15 via-emerald-500/5 to-transparent',
     border: 'border-emerald-500/30',
     badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
@@ -110,11 +115,13 @@ function getClientEffectiveStage(client: Client): PipelineStage {
 
 export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
   clients,
+  projects,
   onUpdateClientStage,
   onEditClient,
   onDeleteClient,
   onCreateProjectForClient,
-  onAddNewClientInStage
+  onAddNewClientInStage,
+  onOpenProjectDetail
 }) => {
   const [draggedClientId, setDraggedClientId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<PipelineStage | null>(null);
@@ -177,12 +184,6 @@ export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
     }
     setDraggedClientId(null);
     setDragOverStage(null);
-  };
-
-  const getTelegramUrl = (tg?: string) => {
-    if (!tg) return undefined;
-    const clean = tg.replace('@', '').replace('https://t.me/', '').trim();
-    return `https://t.me/${clean}`;
   };
 
   return (
@@ -254,6 +255,15 @@ export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
                     const nextStage = getNextStage(col.stage);
                     const prevStage = getPrevStage(col.stage);
                     const tgUrl = getTelegramUrl(client.telegram);
+
+                    const clientActiveProjects = (projects || []).filter((p) => {
+                      const normName = client.name.trim().toLowerCase();
+                      const normCompany = client.company ? client.company.trim().toLowerCase() : '';
+                      const pClient = p.client.trim().toLowerCase();
+                      const isMatch = pClient === normName || (normCompany && pClient === normCompany);
+                      return isMatch && p.status !== 'completed' && p.status !== 'cancelled';
+                    });
+                    const hasActiveProjects = clientActiveProjects.length > 0;
 
                     return (
                       <div
@@ -344,7 +354,7 @@ export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
                               className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 truncate hover:underline"
                             >
                               <MessageSquare className="w-3 h-3 shrink-0" />
-                              <span className="truncate max-w-[100px]">{client.telegram}</span>
+                              <span className="truncate max-w-[100px]">{formatTelegramHandle(client.telegram)}</span>
                             </a>
                           )}
                           {(client.phone || client.whatsapp || client.max) && (
@@ -395,15 +405,45 @@ export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
                             <div className="w-6" />
                           )}
 
-                          {/* Quick "Launch Project" button */}
-                          <button
-                            onClick={() => onCreateProjectForClient(client)}
-                            className="px-2.5 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
-                            title="Запустить рабочий проект в трекере для этого клиента"
-                          >
-                            <Rocket className="w-3 h-3 text-cyan-300" />
-                            <span>В проект</span>
-                          </button>
+                          {/* Quick "Launch Project" button or "In Progress" badge */}
+                          {hasActiveProjects ? (
+                            onOpenProjectDetail ? (
+                              <button
+                                onClick={() => onOpenProjectDetail(clientActiveProjects[0].id)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer truncate max-w-[135px]"
+                                title={`Проект уже в работе: "${clientActiveProjects[0].title}". Нажмите, чтобы открыть в трекере.`}
+                              >
+                                <FolderKanban className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                                <span className="truncate">В работе ({clientActiveProjects.length})</span>
+                              </button>
+                            ) : (
+                              <span
+                                className="px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1 truncate"
+                                title="Проект уже запущен в трекере"
+                              >
+                                <FolderKanban className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                                <span className="truncate">В работе ({clientActiveProjects.length})</span>
+                              </span>
+                            )
+                          ) : col.stage === 'deal_won' ? (
+                            <button
+                              onClick={() => onCreateProjectForClient(client)}
+                              className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
+                              title="Сделка закрыта! Запустить рабочий проект в трекере"
+                            >
+                              <Rocket className="w-3.5 h-3.5 text-cyan-300" />
+                              <span>Запустить проект</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onCreateProjectForClient(client)}
+                              className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                              title="Создать рабочий проект для этого клиента"
+                            >
+                              <Rocket className="w-3 h-3 text-indigo-400" />
+                              <span>В проект</span>
+                            </button>
+                          )}
 
                           {/* Next Stage Button */}
                           {nextStage ? (
