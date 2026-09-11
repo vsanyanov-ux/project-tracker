@@ -135,6 +135,8 @@ export const seedClientsFromProjects = (projects: Project[], existingClients: Cl
       company: rawName.includes('ИП ') || rawName.includes('ООО ') ? rawName : undefined,
       telegram,
       phone,
+      whatsapp: phone,
+      max: phone,
       email,
       status,
       tags: categories,

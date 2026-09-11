@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import type { Client, PipelineStage } from '../types/client';
 import { formatCurrency } from '../utils/formatters';
+import { ClientPhoneContact } from './ClientPhoneContact';
 import { 
   ChevronLeft, 
   ChevronRight, 
   Plus, 
   GripVertical, 
   MessageSquare, 
-  Phone, 
   Rocket, 
   Edit2, 
   Trash2,
@@ -333,8 +333,8 @@ export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
                           </div>
                         )}
 
-                        {/* Contact info: Telegram / Phone */}
-                        <div className="flex items-center gap-3 text-[11px] text-slate-400 my-2">
+                        {/* Contact info: Telegram / Phone / WhatsApp / MAX */}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 my-2">
                           {tgUrl && (
                             <a
                               href={tgUrl}
@@ -344,17 +344,18 @@ export const CrmPipelineBoard: React.FC<CrmPipelineBoardProps> = ({
                               className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 truncate hover:underline"
                             >
                               <MessageSquare className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{client.telegram}</span>
+                              <span className="truncate max-w-[100px]">{client.telegram}</span>
                             </a>
                           )}
-                          {client.phone && (
-                            <a
-                              href={`tel:${client.phone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 shrink-0"
-                            >
-                              <Phone className="w-3 h-3" />
-                            </a>
+                          {(client.phone || client.whatsapp || client.max) && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <ClientPhoneContact
+                                phone={client.phone}
+                                whatsapp={client.whatsapp}
+                                max={client.max}
+                                compact={true}
+                              />
+                            </div>
                           )}
                         </div>
 

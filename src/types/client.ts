@@ -15,6 +15,8 @@ export interface Client {
   contactPerson?: string;
   telegram?: string;
   phone?: string;
+  whatsapp?: string;
+  max?: string;
   email?: string;
   website?: string;
   status: ClientStatus;

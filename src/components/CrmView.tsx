@@ -4,11 +4,11 @@ import type { Project } from '../types/project';
 import { calculateClientStats } from '../utils/clientStorage';
 import { formatCurrency } from '../utils/formatters';
 import { CrmPipelineBoard } from './CrmPipelineBoard';
+import { ClientPhoneContact } from './ClientPhoneContact';
 import {
   Users,
   UserPlus,
   Building2,
-  Phone,
   Mail,
   Globe,
   MessageSquare,
@@ -157,9 +157,11 @@ export function CrmView({
           const inContact = (c.contactPerson || '').toLowerCase().includes(q);
           const inTg = (c.telegram || '').toLowerCase().includes(q);
           const inPhone = (c.phone || '').toLowerCase().includes(q);
+          const inWa = (c.whatsapp || '').toLowerCase().includes(q);
+          const inMax = (c.max || '').toLowerCase().includes(q);
           const inNotes = (c.notes || '').toLowerCase().includes(q);
           const inTags = (c.tags || []).some((t) => t.toLowerCase().includes(q));
-          if (!inName && !inCompany && !inContact && !inTg && !inPhone && !inNotes && !inTags) {
+          if (!inName && !inCompany && !inContact && !inTg && !inPhone && !inWa && !inMax && !inNotes && !inTags) {
             return false;
           }
         }
@@ -603,12 +605,13 @@ export function CrmView({
                       </div>
                     )}
 
-                    {c.phone && (
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <a href={`tel:${c.phone}`} className="hover:text-emerald-300 truncate">
-                          {c.phone}
-                        </a>
+                    {(c.phone || c.whatsapp || c.max) && (
+                      <div className="pt-0.5">
+                        <ClientPhoneContact
+                          phone={c.phone}
+                          whatsapp={c.whatsapp}
+                          max={c.max}
+                        />
                       </div>
                     )}
 
