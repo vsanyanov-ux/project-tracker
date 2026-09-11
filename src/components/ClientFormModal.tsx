@@ -329,7 +329,7 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
                     <MaxIcon className="w-3.5 h-3.5 text-indigo-400" />
                     <span>МАКС (MAX)</span>
                   </span>
-                  <span className="text-[10px] text-slate-400">только номер</span>
+                  <span className="text-[10px] text-slate-400">номер или max.ru/u/...</span>
                 </label>
                 <div className="relative">
                   <MaxIcon className="w-4 h-4 text-indigo-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -337,12 +337,16 @@ export function ClientFormModal({ isOpen, onClose, onSave, clientToEdit, initial
                     type="text"
                     value={max}
                     onChange={(e) => setMax(e.target.value)}
-                    placeholder="+7 (999) 000-00-00"
+                    placeholder="+7 (999) 000-00-00 или max.ru/u/..."
                     className="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-sm"
                   />
                 </div>
               </div>
             </div>
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              💡 <em>В WhatsApp чат открывается сразу по номеру. В МАКС номер копируется для быстрого поиска, либо можно указать профиль <code className="text-indigo-300">max.ru/u/...</code> для моментального входа в диалог.</em>
+            </p>
           </div>
 
           {/* Website & Next Follow-up */}

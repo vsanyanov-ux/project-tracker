@@ -3,8 +3,10 @@ import { Phone, Copy, Check, ExternalLink } from 'lucide-react';
 import { WhatsAppIcon, MaxIcon } from './MessengerIcons';
 import { 
   getWhatsAppUrl, 
-  handleOpenMax, 
-  copyToClipboard 
+  copyToClipboard,
+  isMaxProfileUrl,
+  getMaxUrl,
+  cleanPhoneForMessenger
 } from '../utils/messenger';
 
 interface ClientPhoneContactProps {
@@ -25,6 +27,7 @@ export const ClientPhoneContact: React.FC<ClientPhoneContactProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showMaxModal, setShowMaxModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const effectivePhone = phone?.trim();
@@ -71,14 +74,24 @@ export const ClientPhoneContact: React.FC<ClientPhoneContactProps> = ({
     }
   };
 
-  const onMaxClick = (e: React.MouseEvent) => {
+  const onMaxClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    handleOpenMax(effectiveMax, (msg) => {
-      setFeedback(msg);
-      setTimeout(() => setFeedback(null), 3000);
-    });
     setIsOpen(false);
+
+    // If it's an invite link (max.ru/u/...), open it directly in MAX
+    if (isMaxProfileUrl(effectiveMax)) {
+      window.open(getMaxUrl(effectiveMax), '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // If it's a phone number, copy to clipboard, open web.max.ru and show guidance modal
+    const clean = cleanPhoneForMessenger(effectiveMax || '') || effectiveMax || '';
+    await copyToClipboard(clean);
+    setFeedback('Номер скопирован!');
+    setTimeout(() => setFeedback(null), 3000);
+    setShowMaxModal(true);
+    window.open('https://web.max.ru', '_blank', 'noopener,noreferrer');
   };
 
   const onWhatsAppClick = (e: React.MouseEvent) => {
@@ -228,6 +241,100 @@ export const ClientPhoneContact: React.FC<ClientPhoneContactProps> = ({
               </span>
             </div>
           </button>
+        </div>
+      )}
+
+      {/* Max Contact Guidance Modal */}
+      {showMaxModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMaxModal(false);
+          }}
+        >
+          <div 
+            className="w-full max-w-md bg-slate-900/95 border border-indigo-500/30 rounded-3xl p-6 shadow-2xl glass-panel relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-400">
+                  <MaxIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Переход в чат МАКС</h3>
+                  <p className="text-[11px] text-slate-400">Поиск контакта по номеру</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMaxModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="py-4 space-y-3">
+              {/* Number Banner */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-indigo-400 block">Номер в буфере обмена:</span>
+                  <span className="font-mono text-base font-bold text-white tracking-wider">
+                    {effectiveMax}
+                  </span>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Скопировано</span>
+                </span>
+              </div>
+
+              {/* Instructions */}
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2 text-xs text-slate-300">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 text-[11px] font-bold">1</span>
+                  <span>Приложение или сайт <strong>MAX</strong> открыты</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 text-[11px] font-bold">2</span>
+                  <span>В МАКС нажмите в строку <strong>«Поиск»</strong> вверху</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 text-[11px] font-bold">3</span>
+                  <span>Вставьте номер (<kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Ctrl+V</kbd>) и нажмите <strong>«Найти по номеру»</strong></span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                💡 <em>В мессенджере МАКС прямые ссылки по номеру телефона отключены разработчиками для защиты приватности. Если клиент пришлет ссылку на свой профиль (<code className="text-indigo-300">max.ru/u/...</code>), сохраните её в карточке, и чат будет открываться сразу в 1 клик!</em>
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  window.open('https://web.max.ru', '_blank', 'noopener,noreferrer');
+                }}
+                className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Открыть МАКС ещё раз</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMaxModal(false)}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 cursor-pointer"
+              >
+                Понятно
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

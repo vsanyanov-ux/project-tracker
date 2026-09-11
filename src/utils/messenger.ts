@@ -22,6 +22,21 @@ export const getWhatsAppUrl = (phone?: string): string | undefined => {
 };
 
 /**
+ * Проверяет, является ли значение прямой ссылкой на профиль в МАКС (max.ru/u/...)
+ */
+export const isMaxProfileUrl = (val?: string): boolean => {
+  if (!val) return false;
+  const trimmed = val.trim();
+  return (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.includes('max.ru/u/') ||
+    trimmed.includes('web.max.ru/u/') ||
+    trimmed.startsWith('max://u/')
+  );
+};
+
+/**
  * Получает ссылку для перехода в МАКС
  */
 export const getMaxUrl = (maxVal?: string): string => {
