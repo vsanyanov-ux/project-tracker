@@ -37,6 +37,7 @@ interface HeaderProps {
   archiveCount: number;
   clientsCount?: number;
   onOpenNewClient?: () => void;
+  onOpenAiSettings: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -54,7 +55,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeCount,
   archiveCount,
   clientsCount = 0,
-  onOpenNewClient
+  onOpenNewClient,
+  onOpenAiSettings
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,6 +208,16 @@ export const Header: React.FC<HeaderProps> = ({
               <RotateCcw className="w-4 h-4" />
             </button>
           </div>
+
+          {/* DeepSeek AI Configuration Button */}
+          <button
+            onClick={onOpenAiSettings}
+            className="p-2 sm:px-3 rounded-xl bg-gradient-to-r from-cyan-500/10 via-indigo-500/10 to-purple-500/10 hover:from-cyan-500/20 hover:to-purple-500/20 text-cyan-300 hover:text-white border border-cyan-500/30 transition-all text-xs font-semibold flex items-center gap-1.5 shadow-[0_0_12px_rgba(6,182,212,0.15)] cursor-pointer"
+            title="Настройки DeepSeek AI"
+          >
+            <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <span className="hidden sm:inline font-bold">DeepSeek AI</span>
+          </button>
 
           {/* Desktop "+ Новый проект / клиент" button */}
           {currentTab === 'clients' ? (

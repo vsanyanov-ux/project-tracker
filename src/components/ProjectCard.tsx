@@ -76,6 +76,22 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               <span className={`w-2 h-2 rounded-full ${priorityInfo.dotClass}`} />
               <span>{priorityInfo.label}</span>
             </div>
+            {project.aiAudit && (
+              <div 
+                className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  project.aiAudit.status === 'healthy' ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' :
+                  project.aiAudit.status === 'warning' ? 'bg-amber-950/60 text-amber-300 border-amber-500/30' :
+                  'bg-rose-950/60 text-rose-300 border-rose-500/30'
+                }`}
+                title={`AI Аудит (${project.aiAudit.score}/100): ${project.aiAudit.summary}`}
+              >
+                <Sparkles className="w-2.5 h-2.5" />
+                <span>
+                  {project.aiAudit.status === 'healthy' ? 'AI: В норме' :
+                   project.aiAudit.status === 'warning' ? 'AI: Внимание' : 'AI: Риск'}
+                </span>
+              </div>
+            )}
           </div>
 
           <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border} flex items-center gap-1`}>

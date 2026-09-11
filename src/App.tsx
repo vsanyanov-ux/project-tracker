@@ -16,6 +16,7 @@ import { CrmView } from './components/CrmView';
 import { ProjectDetailModal } from './components/ProjectDetailModal';
 import { ProjectFormModal } from './components/ProjectFormModal';
 import { ClientFormModal } from './components/ClientFormModal';
+import { AiSettingsModal } from './components/AiSettingsModal';
 import { Plus, FolderSearch, CheckCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -68,6 +69,9 @@ export function App() {
   // Client Modal state
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+
+  // AI Settings Modal state
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -430,6 +434,7 @@ export function App() {
           activeCount={activeCount}
           archiveCount={archiveCount}
           clientsCount={clients.length}
+          onOpenAiSettings={() => setIsAiSettingsOpen(true)}
         />
 
         {/* Section View: Active vs Archive vs CRM */}
@@ -563,6 +568,7 @@ export function App() {
             setEditingProject(p);
             setIsFormModalOpen(true);
           }}
+          onOpenAiSettings={() => setIsAiSettingsOpen(true)}
         />
       )}
 
@@ -578,6 +584,7 @@ export function App() {
         initialProject={editingProject}
         existingClients={clients}
         prefilledClient={prefilledClientForProject}
+        onOpenAiSettings={() => setIsAiSettingsOpen(true)}
       />
 
       {/* Create / Edit Client Modal */}
@@ -592,6 +599,13 @@ export function App() {
         clientToEdit={editingClient}
         initialStage={clientInitialStage}
         existingClients={clients}
+      />
+
+      {/* DeepSeek AI Settings Modal */}
+      <AiSettingsModal
+        isOpen={isAiSettingsOpen}
+        onClose={() => setIsAiSettingsOpen(false)}
+        onSaved={() => showToast('Настройки DeepSeek AI успешно сохранены!')}
       />
 
       {/* Floating Toast Notification */}

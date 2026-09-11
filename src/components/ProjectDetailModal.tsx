@@ -30,10 +30,25 @@ import {
   CheckCircle2,
   AlertCircle,
   Zap,
-  Archive,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  Copy,
+  Check,
+  ShieldAlert,
+  TrendingUp,
+  Loader2,
+  Wand2,
+  Key,
+  Archive
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { 
+  generateClientCommunication, 
+  parseClientFeedbackToTasks, 
+  auditProjectRisks, 
+  hasDeepSeekConfigured 
+} from '../services/deepseek';
+import type { AiClientUpdateMode } from '../types/ai';
 
 interface ProjectDetailModalProps {
   project: Project;
@@ -42,9 +57,10 @@ interface ProjectDetailModalProps {
   onUpdateProject: (updated: Project) => void;
   onDeleteProject: (projectId: string) => void;
   onOpenEditModal: (project: Project) => void;
+  onOpenAiSettings?: () => void;
 }
 
-type TabType = 'tasks' | 'finance' | 'links' | 'notes';
+type TabType = 'tasks' | 'finance' | 'links' | 'notes' | 'ai';
 
 export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   project,
@@ -52,7 +68,8 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   onClose,
   onUpdateProject,
   onDeleteProject,
-  onOpenEditModal
+  onOpenEditModal,
+  onOpenAiSettings
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('tasks');
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -63,6 +80,24 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   const [newLinkType, setNewLinkType] = useState<ProjectLink['type']>('other');
   const [notesDraft, setNotesDraft] = useState(project ? (project.notes || '') : '');
   const [isNotesSaved, setIsNotesSaved] = useState(false);
+
+  // AI State
+  const [aiCommsMode, setAiCommsMode] = useState<AiClientUpdateMode>('weekly_report');
+  const [aiCommsNote, setAiCommsNote] = useState('');
+  const [aiCommsResult, setAiCommsResult] = useState('');
+  const [isGeneratingComms, setIsGeneratingComms] = useState(false);
+  const [commsError, setCommsError] = useState<string | null>(null);
+  const [commsCopied, setCommsCopied] = useState(false);
+
+  // AI Feedback to Tasks State
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isParsingFeedback, setIsParsingFeedback] = useState(false);
+  const [extractedTasks, setExtractedTasks] = useState<Array<{ title: string; priority: Priority; selected: boolean }>>([]);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  // AI Audit State
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
   useEffect(() => {
     if (project) {
@@ -293,6 +328,108 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     });
     setIsNotesSaved(true);
     setTimeout(() => setIsNotesSaved(false), 2000);
+  };
+
+  // AI Copilot Handlers
+  const handleGenerateComms = async () => {
+    if (!hasDeepSeekConfigured()) {
+      setCommsError('API-ключ DeepSeek не настроен. Нажмите "Настроить AI", чтобы ввести ключ.');
+      return;
+    }
+    setIsGeneratingComms(true);
+    setCommsError(null);
+    try {
+      const text = await generateClientCommunication({
+        project,
+        mode: aiCommsMode,
+        customNote: aiCommsNote
+      });
+      setAiCommsResult(text);
+    } catch (err) {
+      setCommsError(err instanceof Error ? err.message : 'Ошибка генерации текста через DeepSeek');
+    } finally {
+      setIsGeneratingComms(false);
+    }
+  };
+
+  const handleCopyComms = () => {
+    if (!aiCommsResult) return;
+    navigator.clipboard.writeText(aiCommsResult);
+    setCommsCopied(true);
+    setTimeout(() => setCommsCopied(false), 2000);
+  };
+
+  const handleParseFeedback = async () => {
+    if (!feedbackText.trim()) {
+      setFeedbackError('Введите текст правок или сообщений клиента');
+      return;
+    }
+    if (!hasDeepSeekConfigured()) {
+      setFeedbackError('API-ключ DeepSeek не настроен. Нажмите "Настроить AI", чтобы ввести ключ.');
+      return;
+    }
+    setIsParsingFeedback(true);
+    setFeedbackError(null);
+    try {
+      const extracted = await parseClientFeedbackToTasks(feedbackText);
+      setExtractedTasks(extracted.map(t => ({
+        title: t.title,
+        priority: (t.priority as Priority) || 'medium',
+        selected: true
+      })));
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : 'Не удалось разобрать сообщение');
+    } finally {
+      setIsParsingFeedback(false);
+    }
+  };
+
+  const handleAddExtractedTasksToProject = () => {
+    const tasksToAdd = extractedTasks.filter(t => t.selected);
+    if (tasksToAdd.length === 0) return;
+
+    const newTasks: Task[] = tasksToAdd.map((t, idx) => ({
+      id: 'task-' + Date.now() + '-' + idx,
+      title: t.title,
+      completed: false
+    }));
+
+    onUpdateProject({
+      ...project,
+      tasks: [...(project.tasks || []), ...newTasks],
+      updatedAt: new Date().toISOString()
+    });
+
+    confetti({
+      particleCount: 35,
+      spread: 45,
+      origin: { y: 0.6 }
+    });
+
+    setFeedbackText('');
+    setExtractedTasks([]);
+    setActiveTab('tasks');
+  };
+
+  const handleRunAudit = async () => {
+    if (!hasDeepSeekConfigured()) {
+      setAuditError('API-ключ DeepSeek не настроен. Нажмите "Настроить AI", чтобы ввести ключ.');
+      return;
+    }
+    setIsAuditing(true);
+    setAuditError(null);
+    try {
+      const audit = await auditProjectRisks(project);
+      onUpdateProject({
+        ...project,
+        aiAudit: audit,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : 'Ошибка проведения AI-аудита');
+    } finally {
+      setIsAuditing(false);
+    }
   };
 
   if (!isOpen || !project) return null;
@@ -560,7 +697,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
           <button
             onClick={() => setActiveTab('notes')}
-            className={`pb-3 px-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            className={`pb-3 px-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'notes'
                 ? 'border-purple-500 text-white'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -568,6 +705,27 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
           >
             <FileText className="w-4 h-4 text-purple-400" />
             Заметки и ТЗ
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`pb-3 px-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'ai'
+                ? 'border-cyan-400 text-white font-bold'
+                : 'border-transparent text-slate-400 hover:text-cyan-300'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <span>DeepSeek AI</span>
+            {project.aiAudit && (
+              <span 
+                className={`w-2 h-2 rounded-full ${
+                  project.aiAudit.status === 'healthy' ? 'bg-emerald-400' :
+                  project.aiAudit.status === 'warning' ? 'bg-amber-400' : 'bg-rose-500'
+                }`} 
+                title={`AI Аудит: ${project.aiAudit.score}/100`}
+              />
+            )}
           </button>
         </div>
 
@@ -995,6 +1153,439 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 <span className="font-semibold text-slate-300 block">💡 Подсказка:</span>
                 <p>Все заметки автоматически сохраняются в локальной базе вашего браузера и доступны оффлайн.</p>
               </div>
+            </div>
+          )}
+
+          {/* TAB 5: DeepSeek AI Suite */}
+          {activeTab === 'ai' && (
+            <div className="space-y-6">
+              
+              {/* Feature 3: AI Risk & Health Advisor */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-cyan-950/40 border border-cyan-500/30 shadow-xl space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+                      <ShieldAlert className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                        Аудит рисков и здоровья проекта
+                        <span className="text-[10px] lowercase font-normal px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">
+                          health check
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Анализ дедлайна, темпа выполнения задач и финансовых разрывов
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {onOpenAiSettings && (
+                      <button
+                        onClick={onOpenAiSettings}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-cyan-300 border border-white/10 transition-colors"
+                        title="Настройки DeepSeek"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleRunAudit}
+                      disabled={isAuditing}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {isAuditing ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-200" />
+                          <span>Анализ...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-200" />
+                          <span>{project.aiAudit ? 'Обновить аудит' : 'Запустить аудит'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {auditError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{auditError}</span>
+                  </div>
+                )}
+
+                {project.aiAudit ? (
+                  <div className="space-y-3 pt-2">
+                    {/* Score Bar & Status */}
+                    <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900/80 border border-white/5 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className={`text-2xl font-black ${
+                          project.aiAudit.status === 'healthy' ? 'text-emerald-400' :
+                          project.aiAudit.status === 'warning' ? 'text-amber-400' : 'text-rose-400'
+                        }`}>
+                          {project.aiAudit.score}/100
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2.5 h-2.5 rounded-full ${
+                              project.aiAudit.status === 'healthy' ? 'bg-emerald-400 animate-pulse' :
+                              project.aiAudit.status === 'warning' ? 'bg-amber-400 animate-pulse' : 'bg-rose-500 animate-pulse'
+                            }`} />
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">
+                              {project.aiAudit.status === 'healthy' ? '🟢 В графике / Низкий риск' :
+                               project.aiAudit.status === 'warning' ? '🟡 Умеренный риск / Внимание' : '🔴 Критический риск срыва'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500">
+                            Проверено: {new Date(project.aiAudit.analyzedAt).toLocaleString('ru-RU')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="w-full sm:w-48 bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            project.aiAudit.status === 'healthy' ? 'bg-emerald-500' :
+                            project.aiAudit.status === 'warning' ? 'bg-amber-500' : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${project.aiAudit.score}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Summary Verdict */}
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5 text-xs text-slate-300 leading-relaxed">
+                      <strong className="text-white block mb-1">Вердикт эксперта:</strong>
+                      {project.aiAudit.summary}
+                    </div>
+
+                    {/* Bottlenecks & Recommendations Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Bottlenecks */}
+                      {project.aiAudit.bottlenecks && project.aiAudit.bottlenecks.length > 0 && (
+                        <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 space-y-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                            Узкие места и угрозы
+                          </span>
+                          <ul className="space-y-1 text-xs text-slate-300">
+                            {project.aiAudit.bottlenecks.map((item, idx) => (
+                              <li key={idx} className="flex items-start gap-1.5">
+                                <span className="text-rose-400 font-bold">•</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Recommendations */}
+                      {project.aiAudit.recommendations && project.aiAudit.recommendations.length > 0 && (
+                        <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/20 space-y-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+                            Советы по оптимизации
+                          </span>
+                          <ul className="space-y-1 text-xs text-slate-300">
+                            {project.aiAudit.recommendations.map((item, idx) => (
+                              <li key={idx} className="flex items-start gap-1.5">
+                                <span className="text-cyan-400 font-bold">✓</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-900/50 border border-dashed border-white/10 text-center text-xs text-slate-400">
+                    Нажмите «Запустить аудит», чтобы DeepSeek проанализировал оставшиеся дни, незакрытые задачи и дал рекомендации.
+                  </div>
+                )}
+              </div>
+
+              {/* Feature 2: AI Client Updates Copilot */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-950/40 via-slate-900/60 to-indigo-950/40 border border-purple-500/30 shadow-xl space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                      <Send className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+                        AI-Копирайтер для заказчика
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Генерация статус-отчетов, напоминаний об оплате и фоллоу-апов в Telegram/WhatsApp
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Switcher Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAiCommsMode('weekly_report')}
+                    className={`p-2 rounded-xl text-xs font-semibold border transition-all text-left cursor-pointer ${
+                      aiCommsMode === 'weekly_report'
+                        ? 'bg-purple-600/30 border-purple-400 text-white shadow-md'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-bold">📢 Статус-отчет</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Что сделано и шаги</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAiCommsMode('payment_reminder')}
+                    className={`p-2 rounded-xl text-xs font-semibold border transition-all text-left cursor-pointer ${
+                      aiCommsMode === 'payment_reminder'
+                        ? 'bg-amber-600/30 border-amber-400 text-white shadow-md'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-bold">💳 Оплата счета</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Долг: {formatCurrency(owed, project.currency)}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAiCommsMode('milestone_done')}
+                    className={`p-2 rounded-xl text-xs font-semibold border transition-all text-left cursor-pointer ${
+                      aiCommsMode === 'milestone_done'
+                        ? 'bg-emerald-600/30 border-emerald-400 text-white shadow-md'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-bold">🎉 Сдача этапа</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Готово к тестам</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAiCommsMode('gentle_followup')}
+                    className={`p-2 rounded-xl text-xs font-semibold border transition-all text-left cursor-pointer ${
+                      aiCommsMode === 'gentle_followup'
+                        ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-md'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-bold">⏳ Фоллоу-ап</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">Ожидание ответа</div>
+                  </button>
+                </div>
+
+                {/* Additional custom comment input */}
+                <div>
+                  <input
+                    type="text"
+                    value={aiCommsNote}
+                    onChange={(e) => setAiCommsNote(e.target.value)}
+                    placeholder="Дополнительное пожелание (например: упомянуть, что ждем логотип, или перенести созвон на 15:00)..."
+                    className="w-full glass-input px-3.5 py-2 rounded-xl text-xs placeholder:text-slate-500"
+                  />
+                </div>
+
+                {/* Generate Button */}
+                <div className="flex items-center justify-between gap-3">
+                  {commsError && (
+                    <div className="text-[11px] text-rose-300 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>{commsError}</span>
+                    </div>
+                  )}
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={handleGenerateComms}
+                    disabled={isGeneratingComms}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/25 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isGeneratingComms ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-purple-200" />
+                        <span>Генерация текста...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4 text-purple-200" />
+                        <span>Сгенерировать сообщение</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Result Message Box */}
+                {aiCommsResult && (
+                  <div className="p-4 rounded-xl bg-slate-950/70 border border-purple-500/30 space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider">
+                        Готовое сообщение:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyComms}
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          {commsCopied ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-300">Скопировано!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-slate-300" />
+                              <span>Скопировать</span>
+                            </>
+                          )}
+                        </button>
+
+                        {project.clientContact && (() => {
+                          const contactUrl = getContactUrl(project.clientContact);
+                          if (contactUrl && contactUrl.includes('t.me')) {
+                            const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(aiCommsResult)}`;
+                            return (
+                              <a
+                                href={tgShareUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>В Telegram</span>
+                              </a>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    </div>
+
+                    <textarea
+                      value={aiCommsResult}
+                      onChange={(e) => setAiCommsResult(e.target.value)}
+                      rows={6}
+                      className="w-full bg-transparent text-xs text-slate-200 leading-relaxed resize-none focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Feature 2b: AI Feedback Parser to Tasks */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-teal-950/40 border border-emerald-500/30 shadow-xl space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                      <CheckSquare className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+                        Парсер правок от клиента в задачи
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Вставьте сумбурные правки из мессенджера — ИИ выделит конкретные задачи и добавит в проект
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <textarea
+                    value={feedbackText}
+                    onChange={(e) => {
+                      setFeedbackText(e.target.value);
+                      setFeedbackError(null);
+                    }}
+                    placeholder="Вставьте текст клиента (например: «Привет! Поправь кнопку на главной, замени номер телефона в подвале на +7999... и сделай картинки в каталоге кликабельными»)..."
+                    rows={3}
+                    className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs placeholder:text-slate-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  {feedbackError && (
+                    <div className="text-[11px] text-rose-300 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>{feedbackError}</span>
+                    </div>
+                  )}
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={handleParseFeedback}
+                    disabled={isParsingFeedback || !feedbackText.trim()}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isParsingFeedback ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-emerald-200" />
+                        <span>Извлечение задач...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-emerald-200" />
+                        <span>Извлечь задачи</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {extractedTasks.length > 0 && (
+                  <div className="p-4 rounded-xl bg-slate-950/70 border border-emerald-500/30 space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
+                        Найдено задач ({extractedTasks.filter(t => t.selected).length} из {extractedTasks.length}):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddExtractedTasksToProject}
+                        disabled={extractedTasks.filter(t => t.selected).length === 0}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Добавить в проект</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {extractedTasks.map((t, idx) => (
+                        <label 
+                          key={idx}
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-colors ${
+                            t.selected 
+                              ? 'bg-emerald-950/30 border-emerald-500/30 text-slate-200' 
+                              : 'bg-white/5 border-white/5 text-slate-500 line-through'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={t.selected}
+                            onChange={() => {
+                              setExtractedTasks(extractedTasks.map((item, i) => 
+                                i === idx ? { ...item, selected: !item.selected } : item
+                              ));
+                            }}
+                            className="w-4 h-4 rounded border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                          />
+                          <span className="text-xs flex-1">{t.title}</span>
+                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-400">
+                            {t.priority}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 

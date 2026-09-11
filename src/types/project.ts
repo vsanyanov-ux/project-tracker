@@ -1,3 +1,5 @@
+import type { AiAuditResult } from './ai';
+
 export type ProjectStatus =
   | 'backlog'
   | 'in_progress'
@@ -76,6 +78,7 @@ export interface Project {
   links: ProjectLink[];
   notes: string;
   colorTheme: ColorTheme;
+  aiAudit?: AiAuditResult;
   createdAt: string;
   updatedAt: string;
 }

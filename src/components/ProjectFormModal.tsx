@@ -2,8 +2,23 @@ import React, { useState, useEffect } from 'react';
 import type { Project, ProjectStatus, Priority, ColorTheme, Payment, Task, ProjectMilestone } from '../types/project';
 import type { Client } from '../types/client';
 import { DEFAULT_CATEGORIES } from '../types/project';
-import { X, Plus, Trash2, Sparkles, Wallet, CheckCircle2, Clock } from 'lucide-react';
+import { 
+  X, 
+  Plus, 
+  Trash2, 
+  Sparkles, 
+  Wallet, 
+  CheckCircle2, 
+  Clock,
+  Loader2,
+  Wand2,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Key
+} from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
+import { generateProjectFromPrompt, hasDeepSeekConfigured } from '../services/deepseek';
 
 interface ProjectFormModalProps {
   isOpen: boolean;
@@ -12,6 +27,7 @@ interface ProjectFormModalProps {
   initialProject?: Project | null; // If editing
   existingClients?: Client[];
   prefilledClient?: Client | null;
+  onOpenAiSettings?: () => void;
 }
 
 const CATEGORY_PRESETS = [...DEFAULT_CATEGORIES];
@@ -32,7 +48,8 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
   onSave,
   initialProject,
   existingClients,
-  prefilledClient
+  prefilledClient,
+  onOpenAiSettings
 }) => {
   const isEditing = !!initialProject;
 
@@ -53,6 +70,13 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
   const [currency, setCurrency] = useState('₽');
   const [notes, setNotes] = useState('');
 
+  // AI Generator state
+  const [isAiExpanded, setIsAiExpanded] = useState(!initialProject);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSuccess, setAiSuccess] = useState<string | null>(null);
+
   // Initial tasks for creation
   const [tempTasks, setTempTasks] = useState<string[]>([
     'Согласовать ТЗ и структуру',
@@ -61,6 +85,50 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
     'Тестирование и сдача клиенту'
   ]);
   const [newTaskInput, setNewTaskInput] = useState('');
+
+  const handleAiGenerate = async (presetText?: string) => {
+    const promptToUse = presetText || aiPrompt;
+    if (!promptToUse.trim()) {
+      setAiError('Введите описание проекта или ТЗ для ИИ');
+      return;
+    }
+    if (!hasDeepSeekConfigured()) {
+      setAiError('API-ключ DeepSeek не задан. Нажмите "Настроить AI" ниже, чтобы ввести ключ.');
+      return;
+    }
+
+    setIsAiGenerating(true);
+    setAiError(null);
+    setAiSuccess(null);
+
+    try {
+      const breakdown = await generateProjectFromPrompt(promptToUse, CATEGORY_PRESETS);
+      if (breakdown.title) setTitle(breakdown.title);
+      if (breakdown.description) setDescription(breakdown.description);
+      if (breakdown.category) setCategory(breakdown.category);
+      if (breakdown.priority) setPriority(breakdown.priority);
+      if (breakdown.suggestedBudget) {
+        setTotalBudget(breakdown.suggestedBudget);
+        setPrepayment(Math.round(breakdown.suggestedBudget * 0.4));
+      }
+      if (breakdown.estimatedDays) {
+        const target = new Date(Date.now() + breakdown.estimatedDays * 86400000);
+        setDeadline(target.toISOString().split('T')[0]);
+      }
+      if (breakdown.tasks && breakdown.tasks.length > 0) {
+        setTempTasks(breakdown.tasks.map(t => t.title));
+      }
+      if (breakdown.recommendations && breakdown.recommendations.length > 0) {
+        const aiTips = '💡 Рекомендации DeepSeek:\n• ' + breakdown.recommendations.join('\n• ');
+        setNotes(prev => prev ? `${prev}\n\n${aiTips}` : aiTips);
+      }
+      setAiSuccess('✨ Проект успешно декомпозирован! Форма заполнена, можете проверить данные.');
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Ошибка генерации проекта через DeepSeek');
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   useEffect(() => {
     if (initialProject) {
@@ -341,6 +409,146 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+          
+          {/* AI Project Breakdown Card */}
+          <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/60 to-purple-950/30 p-4 shadow-xl shadow-cyan-950/20">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAiExpanded(!isAiExpanded)}
+                className="flex items-center gap-2.5 text-left font-bold text-slate-200 hover:text-white cursor-pointer group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-500 p-[1px] flex items-center justify-center">
+                  <div className="w-full h-full bg-slate-950 rounded-[7px] flex items-center justify-center">
+                    <Wand2 className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white">AI-Декомпозитор проекта</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      DeepSeek
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-normal">
+                    Вставьте ТЗ или опишите проект своими словами — ИИ заполнит форму и создаст задачи
+                  </p>
+                </div>
+              </button>
+
+              <div className="flex items-center gap-2">
+                {onOpenAiSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenAiSettings}
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-cyan-300 border border-white/10 transition-colors"
+                    title="Настройки DeepSeek"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsAiExpanded(!isAiExpanded)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5"
+                >
+                  {isAiExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {isAiExpanded && (
+              <div className="mt-3.5 space-y-3 pt-3 border-t border-white/10 animate-fade-in">
+                <div>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => {
+                      setAiPrompt(e.target.value);
+                      setAiError(null);
+                    }}
+                    placeholder="Например: Сделать Telegram-бота для бронирования столиков в ресторане с админкой на FastAPI и оплатой ЮKassa, бюджет 120k, срок 3 недели..."
+                    rows={3}
+                    className="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs placeholder:text-slate-500 resize-none"
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-slate-400">Быстрые примеры:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = 'Telegram-бот заказа пиццы с админ-панелью и онлайн-оплатой ЮKassa, бюджет 90 000 ₽, срок 14 дней';
+                      setAiPrompt(text);
+                      handleAiGenerate(text);
+                    }}
+                    className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-cyan-500/20 hover:border-cyan-500/30 border border-white/10 text-slate-300 transition-colors cursor-pointer"
+                  >
+                    🤖 Telegram-бот с оплатой
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = 'Редизайн интернет-магазина одежды на React, корзина, фильтры и каталог, бюджет 130 000 ₽, срок 3 недели';
+                      setAiPrompt(text);
+                      handleAiGenerate(text);
+                    }}
+                    className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-indigo-500/20 hover:border-indigo-500/30 border border-white/10 text-slate-300 transition-colors cursor-pointer"
+                  >
+                    🛍️ Магазин на React
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = 'Конверсионный лендинг для онлайн-школы дизайна с квизом и заявками в CRM, бюджет 45 000 ₽, срок 10 дней';
+                      setAiPrompt(text);
+                      handleAiGenerate(text);
+                    }}
+                    className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-purple-500/20 hover:border-purple-500/30 border border-white/10 text-slate-300 transition-colors cursor-pointer"
+                  >
+                    🚀 Лендинг с CRM
+                  </button>
+                </div>
+
+                {/* Actions & Alerts */}
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <div className="flex-1">
+                    {aiError && (
+                      <div className="flex items-center gap-2 text-[11px] text-rose-300 bg-rose-950/40 p-2 rounded-lg border border-rose-500/30">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                        <span>{aiError}</span>
+                      </div>
+                    )}
+                    {aiSuccess && (
+                      <div className="flex items-center gap-2 text-[11px] text-emerald-300 bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/30">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{aiSuccess}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAiGenerate()}
+                    disabled={isAiGenerating || !aiPrompt.trim()}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                  >
+                    {isAiGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-cyan-200" />
+                        <span>Декомпозиция...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4 text-cyan-200" />
+                        <span>Сгенерировать проект</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           
           {/* Title */}
           <div>
