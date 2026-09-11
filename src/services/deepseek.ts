@@ -3,16 +3,61 @@ import type {
   AiAuditResult, 
   AiClientUpdateMode, 
   AiExtractedTask, 
-  DeepSeekModel 
+  DeepSeekModel,
+  AiProvider
 } from '../types/ai';
 import type { Project } from '../types/project';
 import { calculateProjectFinancials, calculateProjectProgress, getDeadlineStatus } from '../utils/formatters';
 
 const STORAGE_KEY_API_KEY = 'project_tracker_deepseek_api_key';
 const STORAGE_KEY_MODEL = 'project_tracker_deepseek_model';
+const STORAGE_KEY_PROVIDER = 'project_tracker_ai_provider';
+const STORAGE_KEY_BASE_URL = 'project_tracker_ai_base_url';
+const STORAGE_KEY_BALANCE = 'project_tracker_ai_balance';
 
-const DIRECT_API_URL = 'https://api.deepseek.com/chat/completions';
-const PROXY_API_URL = '/api/deepseek/chat/completions';
+export const PROVIDER_DEFAULTS: Record<AiProvider, { name: string; baseUrl: string; defaultModel: string; helpUrl: string }> = {
+  aitunnel: {
+    name: 'AI-Tunnel',
+    baseUrl: 'https://api.aitunnel.ru/v1',
+    defaultModel: 'deepseek-chat',
+    helpUrl: 'https://aitunnel.ru/'
+  },
+  deepseek: {
+    name: 'DeepSeek Official',
+    baseUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    helpUrl: 'https://platform.deepseek.com/api_keys'
+  },
+  custom: {
+    name: 'Custom Provider',
+    baseUrl: 'https://api.aitunnel.ru/v1',
+    defaultModel: 'deepseek-chat',
+    helpUrl: ''
+  }
+};
+
+export function getAiProvider(): AiProvider {
+  const p = localStorage.getItem(STORAGE_KEY_PROVIDER);
+  if (p === 'deepseek' || p === 'custom' || p === 'aitunnel') {
+    return p;
+  }
+  return 'aitunnel';
+}
+
+export function setAiProvider(provider: AiProvider): void {
+  localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
+}
+
+export function getAiBaseUrl(): string {
+  const saved = localStorage.getItem(STORAGE_KEY_BASE_URL);
+  if (saved && saved.trim()) return saved.trim();
+  const provider = getAiProvider();
+  return PROVIDER_DEFAULTS[provider]?.baseUrl || 'https://api.aitunnel.ru/v1';
+}
+
+export function setAiBaseUrl(url: string): void {
+  localStorage.setItem(STORAGE_KEY_BASE_URL, url.trim());
+}
 
 export function getDeepSeekApiKey(): string {
   return localStorage.getItem(STORAGE_KEY_API_KEY) || '';
@@ -24,11 +69,15 @@ export function setDeepSeekApiKey(key: string): void {
 
 export function getDeepSeekModel(): DeepSeekModel {
   const model = localStorage.getItem(STORAGE_KEY_MODEL);
-  return (model === 'deepseek-reasoner' ? 'deepseek-reasoner' : 'deepseek-chat') as DeepSeekModel;
+  return model || 'deepseek-chat';
 }
 
 export function setDeepSeekModel(model: DeepSeekModel): void {
   localStorage.setItem(STORAGE_KEY_MODEL, model);
+}
+
+export function getAiBalance(): string | null {
+  return localStorage.getItem(STORAGE_KEY_BALANCE);
 }
 
 export function hasDeepSeekConfigured(): boolean {
@@ -38,17 +87,22 @@ export function hasDeepSeekConfigured(): boolean {
 export function clearDeepSeekConfig(): void {
   localStorage.removeItem(STORAGE_KEY_API_KEY);
   localStorage.removeItem(STORAGE_KEY_MODEL);
+  localStorage.removeItem(STORAGE_KEY_PROVIDER);
+  localStorage.removeItem(STORAGE_KEY_BASE_URL);
+  localStorage.removeItem(STORAGE_KEY_BALANCE);
 }
 
 interface RequestOptions {
   apiKey?: string;
+  baseUrl?: string;
+  provider?: AiProvider;
   model?: DeepSeekModel;
   json?: boolean;
   temperature?: number;
 }
 
 /**
- * Low-level chat completion call to DeepSeek
+ * Low-level chat completion call supporting AI-Tunnel, DeepSeek and Custom endpoints
  */
 export async function callDeepSeekChat(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
@@ -56,18 +110,26 @@ export async function callDeepSeekChat(
 ): Promise<string> {
   const apiKey = options.apiKey || getDeepSeekApiKey();
   if (!apiKey) {
-    throw new Error('API-ключ DeepSeek не задан. Пожалуйста, укажите его в настройках AI.');
+    throw new Error('API-ключ не задан. Пожалуйста, укажите его в настройках AI.');
   }
 
   const model = options.model || getDeepSeekModel();
-  const isReasoner = model === 'deepseek-reasoner';
+  const provider = options.provider || getAiProvider();
+  const providerInfo = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.aitunnel;
+
+  const rawBase = (options.baseUrl || getAiBaseUrl()).trim().replace(/\/+$/, '');
+  let endpoint = rawBase;
+  if (!endpoint.endsWith('/chat/completions')) {
+    endpoint = `${endpoint}/chat/completions`;
+  }
 
   const payload: Record<string, unknown> = {
     model,
     messages,
   };
 
-  // deepseek-reasoner doesn't support temperature or json_object format in certain endpoints
+  const isReasoner = model === 'deepseek-reasoner' || model === 'deepseek-r1';
+
   if (!isReasoner) {
     if (options.temperature !== undefined) {
       payload.temperature = options.temperature;
@@ -77,59 +139,51 @@ export async function callDeepSeekChat(
     }
   }
 
-  // Try direct API first; in dev fallback to Vite proxy if CORS fails
-  const endpoints = [DIRECT_API_URL, PROXY_API_URL];
-  let lastError: Error | null = null;
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
 
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        let errDetails = '';
-        try {
-          const errData = await response.json();
-          errDetails = errData?.error?.message || response.statusText;
-        } catch {
-          errDetails = response.statusText;
-        }
-
-        if (response.status === 401) {
-          throw new Error('Неверный API-ключ DeepSeek. Проверьте правильность ключа в настройках.');
-        } else if (response.status === 402) {
-          throw new Error('Недостаточно средств на балансе DeepSeek аккаунта.');
-        } else if (response.status === 429) {
-          throw new Error('Превышен лимит запросов (Rate Limit) DeepSeek. Попробуйте через пару секунд.');
-        } else {
-          throw new Error(`Ошибка DeepSeek (${response.status}): ${errDetails}`);
-        }
-      }
-
-      const data = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-      if (typeof content !== 'string') {
-        throw new Error('DeepSeek вернул пустой или некорректный ответ.');
-      }
-      return content;
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      // If it's a fetch network error and we have another endpoint to try, continue
-      if (endpoint === DIRECT_API_URL && (error.message.includes('Failed to fetch') || error.name === 'TypeError')) {
-        lastError = error;
-        continue;
-      }
-      throw error;
+    const balanceHeader = response.headers.get('balance');
+    if (balanceHeader) {
+      localStorage.setItem(STORAGE_KEY_BALANCE, balanceHeader);
     }
-  }
 
-  throw lastError || new Error('Не удалось связаться с сервером DeepSeek.');
+    if (!response.ok) {
+      let errDetails = '';
+      try {
+        const errData = await response.json();
+        errDetails = errData?.error?.message || errData?.message || response.statusText;
+      } catch {
+        errDetails = response.statusText;
+      }
+
+      if (response.status === 401) {
+        throw new Error(`Неверный API-ключ (${providerInfo.name}). Проверьте ключ в личном кабинете ${providerInfo.helpUrl}`);
+      } else if (response.status === 402) {
+        throw new Error(`Недостаточно средств на балансе (${providerInfo.name}).`);
+      } else if (response.status === 429) {
+        throw new Error(`Превышен лимит запросов (${providerInfo.name}). Попробуйте через пару секунд.`);
+      } else {
+        throw new Error(`Ошибка ${providerInfo.name} (${response.status}): ${errDetails}`);
+      }
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') {
+      throw new Error(`${providerInfo.name} вернул пустой или некорректный ответ.`);
+    }
+    return content;
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    throw error;
+  }
 }
 
 /**
@@ -137,8 +191,10 @@ export async function callDeepSeekChat(
  */
 export async function testDeepSeekConnection(
   testKey?: string,
-  testModel?: DeepSeekModel
-): Promise<{ success: boolean; message: string }> {
+  testModel?: DeepSeekModel,
+  testBaseUrl?: string,
+  testProvider?: AiProvider
+): Promise<{ success: boolean; message: string; balance?: string | null }> {
   try {
     const reply = await callDeepSeekChat(
       [
@@ -148,14 +204,27 @@ export async function testDeepSeekConnection(
       {
         apiKey: testKey,
         model: testModel || 'deepseek-chat',
+        baseUrl: testBaseUrl,
+        provider: testProvider,
         temperature: 0.1
       }
     );
 
+    const balance = getAiBalance();
+    const balanceMsg = balance ? ` (Баланс: ${balance} ₽)` : '';
+
     if (reply.toLowerCase().includes('ok')) {
-      return { success: true, message: 'Подключение к DeepSeek успешно установлено!' };
+      return { 
+        success: true, 
+        message: `Подключение успешно установлено!${balanceMsg}`,
+        balance
+      };
     }
-    return { success: true, message: `Подключение успешно: "${reply.trim().slice(0, 50)}"` };
+    return { 
+      success: true, 
+      message: `Подключение успешно: "${reply.trim().slice(0, 40)}"${balanceMsg}`,
+      balance
+    };
   } catch (err) {
     return { 
       success: false, 

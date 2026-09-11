@@ -1,4 +1,5 @@
-export type DeepSeekModel = 'deepseek-chat' | 'deepseek-reasoner';
+export type AiProvider = 'aitunnel' | 'deepseek' | 'custom';
+export type DeepSeekModel = 'deepseek-chat' | 'deepseek-r1' | 'deepseek-reasoner' | 'gpt-4o-mini' | string;
 
 export interface AiProjectBreakdown {
   title: string;

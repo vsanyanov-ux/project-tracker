@@ -18,6 +18,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/deepseek/, ''),
       },
+      '/api/aitunnel': {
+        target: 'https://api.aitunnel.ru',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/aitunnel/, ''),
+      },
     },
   },
 })
