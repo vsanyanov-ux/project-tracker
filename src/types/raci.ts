@@ -1,21 +1,21 @@
 export type RaciRole = 
   | 'founder' 
+  | 'growth'
   | 'product_owner' 
   | 'engineer' 
-  | 'client_cosmetologist' 
-  | 'clinic_admin';
+  | 'client_cosmetologist';
 
 export type RaciCode = 'A' | 'R' | 'C' | 'I' | 'A + R' | '—';
 
 export interface RaciMatrixRow {
   id: string;
   task: string;
-  category: 'strategy' | 'product' | 'engineering' | 'compliance' | 'operations' | 'analytics';
+  category: 'strategy' | 'growth' | 'product' | 'engineering' | 'compliance' | 'operations' | 'analytics';
   founder: RaciCode;
+  growth: RaciCode;
   productOwner: RaciCode;
   engineer: RaciCode;
   clientCosmetologist: RaciCode;
-  clinicAdmin?: RaciCode;
   description: string;
   ruleHint: string;
 }
@@ -57,7 +57,7 @@ export interface DecisionLogEntry {
   decision: string;
   rationale: string;
   approvedBy: string; // Кто утвердил (A)
-  approverRole: 'Клиент-косметолог' | 'Вы как Founder' | 'Вы как Product Owner' | 'Вы как Engineer';
+  approverRole: 'Клиент-косметолог' | 'Вы как Founder' | 'Вы как Growth (Маркетинг/Sales)' | 'Вы как Product Owner' | 'Вы как Engineer';
   reviewDate: string; // Когда пересматриваем
   status: 'active' | 'in_review' | 'archived';
 }

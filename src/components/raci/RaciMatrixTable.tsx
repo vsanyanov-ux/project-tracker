@@ -7,14 +7,13 @@ import {
   Compass, 
   Cpu, 
   Stethoscope, 
-  Headphones, 
   Info, 
-  Sparkles
+  Sparkles,
+  TrendingUp
 } from 'lucide-react';
 
 export const RaciMatrixTable: React.FC = () => {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'founder' | 'po' | 'engineer' | 'client'>('all');
-  const [showAdminColumn, setShowAdminColumn] = useState<boolean>(true);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'founder' | 'growth' | 'po' | 'engineer' | 'client'>('all');
   const [selectedTask, setSelectedTask] = useState<RaciMatrixRow | null>(null);
 
   const getBadgeStyle = (code: RaciCode) => {
@@ -53,6 +52,7 @@ export const RaciMatrixTable: React.FC = () => {
 
   const filteredTasks = RACI_MATRIX_DATA.filter((item) => {
     if (activeFilter === 'founder') return item.founder === 'A';
+    if (activeFilter === 'growth') return item.growth.includes('A');
     if (activeFilter === 'po') return item.productOwner === 'A';
     if (activeFilter === 'engineer') return item.engineer.includes('A');
     if (activeFilter === 'client') return item.clientCosmetologist === 'A';
@@ -78,20 +78,6 @@ export const RaciMatrixTable: React.FC = () => {
             На каждую задачу — строго один владелец результата (A). Вы можете совмещать роли, но принимаете решения по правилам каждой конкретной должности.
           </p>
         </div>
-
-        {/* View Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowAdminColumn(!showAdminColumn)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-              showAdminColumn 
-                ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/40' 
-                : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'
-            }`}
-          >
-            {showAdminColumn ? '✓ Колонка Администратора' : '+ Колонка Администратора'}
-          </button>
-        </div>
       </div>
 
       {/* Role Filter Pills */}
@@ -104,7 +90,7 @@ export const RaciMatrixTable: React.FC = () => {
               : 'glass-panel text-slate-400 hover:text-white border-white/5'
           }`}
         >
-          Все 8 задач
+          Все {RACI_MATRIX_DATA.length} задач
         </button>
 
         <button
@@ -117,6 +103,18 @@ export const RaciMatrixTable: React.FC = () => {
         >
           <Crown className="w-3.5 h-3.5 text-amber-300" />
           Вы как Founder (A)
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('growth')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            activeFilter === 'growth'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+              : 'glass-panel text-slate-400 hover:text-white border-white/5'
+          }`}
+        >
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+          Вы как Growth (A)
         </button>
 
         <button
@@ -172,6 +170,14 @@ export const RaciMatrixTable: React.FC = () => {
               </th>
               <th className="py-4 px-3 text-center">
                 <div className="flex flex-col items-center">
+                  <span className="flex items-center gap-1 text-emerald-300">
+                    <TrendingUp className="w-3 h-3" /> Growth
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal lowercase">маркетинг & sales</span>
+                </div>
+              </th>
+              <th className="py-4 px-3 text-center">
+                <div className="flex flex-col items-center">
                   <span className="flex items-center gap-1 text-purple-300">
                     <Compass className="w-3 h-3" /> Product Owner
                   </span>
@@ -194,16 +200,6 @@ export const RaciMatrixTable: React.FC = () => {
                   <span className="text-[10px] text-slate-400 font-normal lowercase">владелец базы</span>
                 </div>
               </th>
-              {showAdminColumn && (
-                <th className="py-4 px-3 text-center">
-                  <div className="flex flex-col items-center">
-                    <span className="flex items-center gap-1 text-emerald-300">
-                      <Headphones className="w-3 h-3" /> Администратор
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-normal lowercase">ресепшен</span>
-                  </div>
-                </th>
-              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 text-xs sm:text-sm">
@@ -239,6 +235,16 @@ export const RaciMatrixTable: React.FC = () => {
                     </span>
                   </td>
 
+                  {/* Growth */}
+                  <td className="py-4 px-3 text-center">
+                    <span 
+                      className={`inline-block px-2.5 py-1 rounded-lg border text-xs ${getBadgeStyle(row.growth)}`}
+                      title={`Growth: ${getBadgeLabel(row.growth)}`}
+                    >
+                      {row.growth}
+                    </span>
+                  </td>
+
                   {/* Product Owner */}
                   <td className="py-4 px-3 text-center">
                     <span 
@@ -268,18 +274,6 @@ export const RaciMatrixTable: React.FC = () => {
                       {row.clientCosmetologist}
                     </span>
                   </td>
-
-                  {/* Администратор */}
-                  {showAdminColumn && (
-                    <td className="py-4 px-3 text-center">
-                      <span 
-                        className={`inline-block px-2.5 py-1 rounded-lg border text-xs ${getBadgeStyle(row.clinicAdmin || '—')}`}
-                        title={`Администратор: ${getBadgeLabel(row.clinicAdmin || '—')}`}
-                      >
-                        {row.clinicAdmin || '—'}
-                      </span>
-                    </td>
-                  )}
                 </tr>
               );
             })}

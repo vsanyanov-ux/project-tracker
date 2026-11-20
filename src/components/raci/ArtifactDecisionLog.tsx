@@ -59,6 +59,8 @@ export const ArtifactDecisionLog: React.FC<ArtifactDecisionLogProps> = ({
         return 'bg-rose-500/20 text-rose-300 border-rose-500/40';
       case 'Вы как Founder':
         return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      case 'Вы как Growth (Маркетинг/Sales)':
+        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
       case 'Вы как Product Owner':
         return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
       case 'Вы как Engineer':
@@ -159,6 +161,7 @@ export const ArtifactDecisionLog: React.FC<ArtifactDecisionLogProps> = ({
                 >
                   <option value="Клиент-косметолог">Клиент-косметолог</option>
                   <option value="Вы как Founder">Вы как Founder</option>
+                  <option value="Вы как Growth (Маркетинг/Sales)">Вы как Growth (Маркетинг & Sales)</option>
                   <option value="Вы как Product Owner">Вы как Product Owner</option>
                   <option value="Вы как Engineer">Вы как Engineer</option>
                 </select>
