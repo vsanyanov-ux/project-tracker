@@ -13,6 +13,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { ProjectTableView } from './components/ProjectTableView';
 import { ArchiveView } from './components/ArchiveView';
 import { CrmView } from './components/CrmView';
+import { RaciDashboard } from './components/raci/RaciDashboard';
 import { ProjectDetailModal } from './components/ProjectDetailModal';
 import { ProjectFormModal } from './components/ProjectFormModal';
 import { ClientFormModal } from './components/ClientFormModal';
@@ -26,7 +27,7 @@ export function App() {
   const [currentTab, setCurrentTab] = useState<MainTab>(() => {
     try {
       const saved = localStorage.getItem('antigravity_current_tab_v2');
-      if (saved === 'clients' || saved === 'active' || saved === 'archive') {
+      if (saved === 'clients' || saved === 'active' || saved === 'archive' || saved === 'raci') {
         return saved;
       }
     } catch {}
@@ -437,8 +438,18 @@ export function App() {
           onOpenAiSettings={() => setIsAiSettingsOpen(true)}
         />
 
-        {/* Section View: Active vs Archive vs CRM */}
-        {currentTab === 'archive' ? (
+        {/* Section View: RACI vs Active vs Archive vs CRM */}
+        {currentTab === 'raci' ? (
+          /* RACI Framework Section View */
+          <RaciDashboard
+            onShowToast={showToast}
+            onGoToProjects={() => {
+              handleTabChange('active');
+              handleFilterChange({ status: 'all' });
+            }}
+            onGoToCrm={() => handleTabChange('clients')}
+          />
+        ) : currentTab === 'archive' ? (
           /* Archive Section View */
           <ArchiveView
             projects={filteredProjects}

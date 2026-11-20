@@ -96,4 +96,4 @@ export interface FilterOptions {
 
 export type ViewMode = 'grid' | 'kanban' | 'table';
 
-export type MainTab = 'clients' | 'active' | 'archive';
+export type MainTab = 'clients' | 'active' | 'archive' | 'raci';

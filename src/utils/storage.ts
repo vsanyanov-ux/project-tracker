@@ -13,6 +13,7 @@ export const getStoredProjects = (): Project[] => {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       const yatvInit = INITIAL_PROJECTS.find((p) => p.id === 'proj-yatv');
+      const aiAdminInit = INITIAL_PROJECTS.find((p) => p.id === 'proj-ai-admin');
       let updated = false;
 
       let merged: Project[] = (parsed as Project[]).map((p: Project): Project => {
@@ -42,6 +43,12 @@ export const getStoredProjects = (): Project[] => {
       const hasYatv = merged.some((p: Project) => p.id === 'proj-yatv' || p.title.toLowerCase().includes('ятв'));
       if (!hasYatv && yatvInit) {
         merged.unshift(yatvInit);
+        updated = true;
+      }
+
+      const hasAiAdmin = merged.some((p: Project) => p.id === 'proj-ai-admin' || p.title.toLowerCase().includes('ai admin'));
+      if (!hasAiAdmin && aiAdminInit) {
+        merged.unshift(aiAdminInit);
         updated = true;
       }
 

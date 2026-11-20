@@ -18,7 +18,8 @@ import {
   Archive,
   Layers,
   Users,
-  UserPlus
+  UserPlus,
+  ShieldCheck
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -313,11 +314,31 @@ export const Header: React.FC<HeaderProps> = ({
               {archiveCount}
             </span>
           </button>
+
+          {/* 4. RACI Соло-режим */}
+          <button
+            onClick={() => onTabChange('raci')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              currentTab === 'raci'
+                ? 'bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 text-white shadow-lg shadow-rose-600/30'
+                : 'glass-panel text-slate-400 hover:text-white border-white/5 hover:border-white/20'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-cyan-300" />
+            <span>RACI Соло-режим</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              currentTab === 'raci' 
+                ? 'bg-white/20 text-white' 
+                : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+            }`}>
+              AI Admin
+            </span>
+          </button>
         </div>
       </div>
 
-      {/* Filter Chips Bar (hidden on CRM tab) */}
-      {currentTab !== 'clients' && (
+      {/* Filter Chips Bar (hidden on CRM and RACI tabs) */}
+      {currentTab !== 'clients' && currentTab !== 'raci' && (
       <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
         
         {/* Status Filter Chips */}

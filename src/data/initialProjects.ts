@@ -2,6 +2,78 @@ import type { Project } from '../types/project';
 
 export const INITIAL_PROJECTS: Project[] = [
   {
+    id: 'proj-ai-admin',
+    title: 'AI Admin: Ресепшионист & Возврат спящей базы (Косметология)',
+    description: 'Интеллектуальный ИИ-ассистент и ресепшионист для клиник косметологии. Автоматическая сегментация спящей базы (90+ дней), персонализированные офферы в WhatsApp/Telegram и возвращение потерянной выручки в кассу клиники.',
+    client: 'Клиника косметологии «Gladkaya» (Доктор Анна)',
+    clientContact: '+7 (999) 456-78-90 • @gladkaya_beauty',
+    category: 'Автоматизация / Бот',
+    status: 'in_progress',
+    priority: 'urgent',
+    startDate: '2026-11-15',
+    deadline: '2026-12-15',
+    totalBudget: 120000,
+    currency: '₽',
+    colorTheme: 'cyan',
+    payments: [
+      {
+        id: 'pay-ai-1',
+        title: 'Предоплата за интеграцию WhatsApp & CRM',
+        amount: 60000,
+        isPaid: true,
+        paidDate: '2026-11-15',
+        notes: 'Получено на расчетный счет'
+      },
+      {
+        id: 'pay-ai-2',
+        title: 'Success Fee за возврат выручки >90к',
+        amount: 60000,
+        isPaid: false,
+        dueDate: '2026-12-15',
+        notes: 'При достижении целевого KPI'
+      }
+    ],
+    milestones: [
+      {
+        id: 'ms-ai-1',
+        title: 'Этап 1: Сегментация базы и утверждение оффера косметологом (RACI A)',
+        progress: 100,
+        dueDate: '2026-11-19',
+        completed: true
+      },
+      {
+        id: 'ms-ai-2',
+        title: 'Этап 2: Пилотный запуск на 25 контактов и QA-контроль эскалации',
+        progress: 100,
+        dueDate: '2026-11-20',
+        completed: true
+      },
+      {
+        id: 'ms-ai-3',
+        title: 'Этап 3: Масштабирование на всю базу (350 контактов) и еженедельный отчет',
+        progress: 35,
+        dueDate: '2026-11-30',
+        completed: false
+      }
+    ],
+    tasks: [
+      { id: 't-ai-1', title: '【Founder / A】 Утвердить бизнес-модель и KPI возврата выручки', completed: true },
+      { id: 't-ai-2', title: '【Product Owner / A】 Разработать сценарий мягкой записи и нейтрализации возражений', completed: true },
+      { id: 't-ai-3', title: '【Engineer / A+R】 Настроить WhatsApp Bridge и лимиты отправки (50/день)', completed: true },
+      { id: 't-ai-4', title: '【Клиент / A】 Получить письменное согласие Доктора Анны на оффер и consent пациентов', completed: true },
+      { id: 't-ai-5', title: '【QA / R】 Провести пилотный тест на 25 контактов, проверить ответы вручную', completed: true },
+      { id: 't-ai-6', title: '【Администратор / A+R】 Проинструктировать старшего администратора Екатерину по перехвату лидов', completed: true },
+      { id: 't-ai-7', title: '【Founder / A】 Сформировать недельный отчет с фактической выручкой клиники', completed: false }
+    ],
+    links: [
+      { id: 'l-ai-1', title: 'Репозиторий AI Admin', url: 'file:///C:/Users/vanya/Antigravity%20Projects/Corporate/AI%20Admin', type: 'github' },
+      { id: 'l-ai-2', title: 'RACI Матрица и 4 Артефакта', url: '#raci', type: 'docs' }
+    ],
+    notes: '📌 Проект управляется по системе RACI.\n- Единственный Accountable от клиники: Доктор Анна.\n- Исполнительность ведется строго по Чек-листу запуска.\n- Все отклонения от сценария фиксируются в Журнале решений.\n- Отчетность ведется по возвращенной выручке в кассу (Цель: >90 000 ₽).',
+    createdAt: '2026-11-15T10:00:00.000Z',
+    updatedAt: '2026-11-20T08:15:00.000Z'
+  },
+  {
     id: 'proj-yatv',
     title: 'Мультипликационный сериал «ЯТВ» (7 серий)',
     description: 'Психологический анимационный сериал про Зал Ожидания, встречу с фигурами родителей, юности и взрослой частью. Двухнедельный релизный цикл с 24 августа по 6 сентября.',
