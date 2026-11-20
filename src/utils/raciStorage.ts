@@ -4,7 +4,8 @@ import type {
   ClientCardArtifact, 
   ChecklistItem, 
   DecisionLogEntry, 
-  WeeklyReportData 
+  WeeklyReportData,
+  SavedRaciAiTask
 } from '../types/raci';
 
 export const RACI_MATRIX_DATA: RaciMatrixRow[] = [
@@ -313,4 +314,117 @@ export function resetRaciData(): RaciStorageState {
     localStorage.setItem(RACI_STORAGE_KEY, JSON.stringify(initial));
   } catch {}
   return initial;
+}
+
+export const INITIAL_AI_RACI_HISTORY: SavedRaciAiTask[] = [
+  {
+    id: 'ai-task-vps-migration',
+    createdAt: '2026-11-20T09:05:00.000Z',
+    rawPrompt: 'Перенести базу пациентов и сайт с турецкого сервера на российский VPS по 152-ФЗ',
+    result: {
+      taskSummary: 'Миграция баз данных пациентов и сервисов AI Admin с турецкого VPS на российский хостинг (Timeweb Cloud/Selectel) для полного соблюдения 152-ФЗ и 242-ФЗ.',
+      hatsSequence: [
+        {
+          role: 'Founder',
+          stage: 'Шаг 1: Оценка юридических рисков и бюджета',
+          action: 'Выбрать российского облачного провайдера (Timeweb Cloud / Selectel) с аттестатом защиты ПДн в локации Москва/СПб и оплатить базовый VPS.',
+          hatExplanation: 'Затрагивает финансы, юридическую ответственность и стратегию компании.'
+        },
+        {
+          role: 'Product Owner',
+          stage: 'Шаг 2: Планирование бесшовного окна миграции',
+          action: 'Назначить техническое окно миграции на глубокую ночь (02:00–05:00 МСК), когда боты не ведут диалогов, и зафиксировать сохранность сессий WhatsApp.',
+          hatExplanation: 'Защищает клиентский опыт клиник и исключает сбои в расписании.'
+        },
+        {
+          role: 'Engineer',
+          stage: 'Шаг 3: Технический перенос и развертывание Docker',
+          action: 'Создать резервную копию *.db и .wwebjs_auth на турецком сервере, передать по SCP на сервер в РФ и поднять docker compose up -d.',
+          hatExplanation: 'Чистая техническая реализация по инженерному регламенту.'
+        },
+        {
+          role: 'QA',
+          stage: 'Шаг 4: Приемочное тестирование до смены DNS',
+          action: 'Проверить здоровье моста WhatsApp (healthy), целостность баз клиник Gladkaya и Forma, запустить диагностику core.doctor --strict.',
+          hatExplanation: 'Контроль качества перед пуском боевого пациентского трафика.'
+        },
+        {
+          role: 'Engineer',
+          stage: 'Шаг 5: Переключение доменов и SSL',
+          action: 'Перенаправить DNS-записи на новый IP-адрес сервера в РФ и выпустить SSL-сертификаты Certbot/Let\'s Encrypt.',
+          hatExplanation: 'Финальный технический ввод в эксплуатацию.'
+        }
+      ],
+      raciBreakdown: {
+        accountable: 'Вы как Founder (за соблюдение 152-ФЗ и выбор хостинга)',
+        responsible: 'Вы как Engineer (за перенос файлов, Nginx и запуск Docker)',
+        consulted: 'Клиент-косметолог (если требуется уведомить об изменении тех. условий)',
+        informed: 'Администраторы клиник (уведомление об успешном переезде)'
+      },
+      risksAndStopFlags: {
+        requiresClientApproval: false,
+        requiresPilotTest: false,
+        warningText: 'Критически важно выполнить остановку контейнеров перед копированием SQLite баз, чтобы избежать рассинхронизации данных пациентов.'
+      },
+      actionChecklist: [
+        { title: 'Арендовать и настроить VPS Ubuntu в РФ (Timeweb/Selectel)', roleTag: 'Founder', required: true },
+        { title: 'Снять полный бэкап баз gladkaya.db, forma.db и сессий .wwebjs_auth', roleTag: 'Engineer', required: true },
+        { title: 'Перенести архив на сервер в РФ и развернуть docker compose up -d', roleTag: 'Engineer', required: true },
+        { title: 'Проверить авторизацию WhatsApp и запустить core.doctor --strict', roleTag: 'QA', required: true },
+        { title: 'Переключить DNS и выпустить SSL сертификаты', roleTag: 'Engineer', required: true }
+      ],
+      decisionLogDraft: {
+        decision: 'Перенос баз пациентов и сервисов AI Admin на российский VPS (152-ФЗ)',
+        rationale: 'Устранение рисков блокировки РКН и штрафов до 6 млн ₽ по 242-ФЗ о локализации ПДн граждан РФ.',
+        approvedBy: 'Вы (как Founder / Compliance)',
+        approverRole: 'Вы как Founder'
+      }
+    },
+    isChecklistAdded: true,
+    isDecisionAdded: true
+  }
+];
+
+const AI_RACI_HISTORY_KEY = 'antigravity_raci_ai_history_v1';
+const AI_RACI_ACTIVE_ID_KEY = 'antigravity_raci_ai_active_id_v1';
+
+export function getStoredAiRaciHistory(): SavedRaciAiTask[] {
+  try {
+    const raw = localStorage.getItem(AI_RACI_HISTORY_KEY);
+    if (!raw) {
+      localStorage.setItem(AI_RACI_HISTORY_KEY, JSON.stringify(INITIAL_AI_RACI_HISTORY));
+      return INITIAL_AI_RACI_HISTORY;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_AI_RACI_HISTORY;
+  } catch (err) {
+    console.error('Failed to load AI RACI history:', err);
+    return INITIAL_AI_RACI_HISTORY;
+  }
+}
+
+export function saveAiRaciHistory(history: SavedRaciAiTask[]): void {
+  try {
+    localStorage.setItem(AI_RACI_HISTORY_KEY, JSON.stringify(history));
+  } catch (err) {
+    console.error('Failed to save AI RACI history:', err);
+  }
+}
+
+export function getStoredActiveAiTaskId(): string | null {
+  try {
+    return localStorage.getItem(AI_RACI_ACTIVE_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveAiTaskId(id: string | null): void {
+  try {
+    if (id) {
+      localStorage.setItem(AI_RACI_ACTIVE_ID_KEY, id);
+    } else {
+      localStorage.removeItem(AI_RACI_ACTIVE_ID_KEY);
+    }
+  } catch {}
 }

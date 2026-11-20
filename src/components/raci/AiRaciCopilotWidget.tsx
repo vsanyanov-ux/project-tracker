@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
-import type { AiRaciAnalysisResult, ChecklistItem, DecisionLogEntry } from '../../types/raci';
+import React, { useState, useEffect } from 'react';
+import type { ChecklistItem, DecisionLogEntry, SavedRaciAiTask } from '../../types/raci';
 import { decomposeTaskWithRaci, hasDeepSeekConfigured } from '../../services/deepseek';
+import { 
+  getStoredAiRaciHistory, 
+  saveAiRaciHistory, 
+  getStoredActiveAiTaskId, 
+  saveActiveAiTaskId 
+} from '../../utils/raciStorage';
 import { 
   Bot, 
   Sparkles, 
@@ -10,7 +16,6 @@ import {
   AlertTriangle, 
   CheckSquare, 
   FileSpreadsheet, 
-  RotateCcw, 
   Loader2, 
   Settings,
   Crown,
@@ -18,7 +23,12 @@ import {
   Compass,
   Cpu,
   Stethoscope,
-  Check
+  Check,
+  History,
+  Trash2,
+  PlusCircle,
+  Calendar,
+  Clock
 } from 'lucide-react';
 
 interface AiRaciCopilotWidgetProps {
@@ -41,12 +51,35 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
   onOpenAiSettings,
   onShowToast
 }) => {
+  const [history, setHistory] = useState<SavedRaciAiTask[]>(() => getStoredAiRaciHistory());
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
+    const savedId = getStoredActiveAiTaskId();
+    const storedHistory = getStoredAiRaciHistory();
+    if (savedId && storedHistory.some((t) => t.id === savedId)) {
+      return savedId;
+    }
+    return storedHistory.length > 0 ? storedHistory[0].id : null;
+  });
+
   const [taskInput, setTaskInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AiRaciAnalysisResult | null>(null);
-  const [isChecklistAdded, setIsChecklistAdded] = useState(false);
-  const [isDecisionAdded, setIsDecisionAdded] = useState(false);
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(true);
+
+  // Current active task from persistent history
+  const activeTask = history.find((t) => t.id === activeTaskId) || null;
+  const analysisResult = activeTask?.result || null;
+
+  // Sync active task id to storage
+  useEffect(() => {
+    saveActiveAiTaskId(activeTaskId);
+  }, [activeTaskId]);
+
+  // Sync history to storage
+  const updateHistoryAndSave = (updated: SavedRaciAiTask[]) => {
+    setHistory(updated);
+    saveAiRaciHistory(updated);
+  };
 
   const handleDecompose = async (textToAnalyze?: string) => {
     const text = (textToAnalyze || taskInput).trim();
@@ -59,13 +92,24 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
 
     setLoading(true);
     setError(null);
-    setIsChecklistAdded(false);
-    setIsDecisionAdded(false);
 
     try {
       const result = await decomposeTaskWithRaci(text);
-      setAnalysisResult(result);
-      onShowToast('Задача успешно разложена по ролям и RACI! 🤖');
+      
+      const newSavedTask: SavedRaciAiTask = {
+        id: `ai-task-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        rawPrompt: text,
+        result,
+        isChecklistAdded: false,
+        isDecisionAdded: false
+      };
+
+      const updatedHistory = [newSavedTask, ...history];
+      updateHistoryAndSave(updatedHistory);
+      setActiveTaskId(newSavedTask.id);
+      setTaskInput('');
+      onShowToast('Задача разложена по ролям и надежно сохранена в истории! 💾🤖');
     } catch (err) {
       console.error('RACI Copilot error:', err);
       setError(err instanceof Error ? err.message : 'Не удалось получить ответ от ИИ');
@@ -75,7 +119,7 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
   };
 
   const handleAddTasksToChecklist = () => {
-    if (!analysisResult?.actionChecklist || !onAddToChecklist) return;
+    if (!activeTask || !analysisResult?.actionChecklist || !onAddToChecklist) return;
 
     const newItems: ChecklistItem[] = analysisResult.actionChecklist.map((act, idx) => ({
       id: `ai-chk-${Date.now()}-${idx}`,
@@ -87,12 +131,17 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
     }));
 
     onAddToChecklist(newItems);
-    setIsChecklistAdded(true);
+
+    // Update active task status in storage
+    const updatedHistory = history.map((t) => 
+      t.id === activeTask.id ? { ...t, isChecklistAdded: true } : t
+    );
+    updateHistoryAndSave(updatedHistory);
     onShowToast(`Добавлено ${newItems.length} задач в Чек-лист запуска! 📋`);
   };
 
   const handleSaveToDecisionLog = () => {
-    if (!analysisResult?.decisionLogDraft || !onAddToDecisionLog) return;
+    if (!activeTask || !analysisResult?.decisionLogDraft || !onAddToDecisionLog) return;
 
     const draft = analysisResult.decisionLogDraft;
     const newEntry: DecisionLogEntry = {
@@ -107,8 +156,40 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
     };
 
     onAddToDecisionLog(newEntry);
-    setIsDecisionAdded(true);
+
+    // Update active task status in storage
+    const updatedHistory = history.map((t) => 
+      t.id === activeTask.id ? { ...t, isDecisionAdded: true } : t
+    );
+    updateHistoryAndSave(updatedHistory);
     onShowToast('Решение зафиксировано в Журнале решений! 📜');
+  };
+
+  const handleDeleteTaskFromHistory = (idToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Удалить эту задачу из истории AI-разборов?')) {
+      const updated = history.filter((t) => t.id !== idToDelete);
+      updateHistoryAndSave(updated);
+      if (activeTaskId === idToDelete) {
+        setActiveTaskId(updated.length > 0 ? updated[0].id : null);
+      }
+      onShowToast('Задача удалена из истории');
+    }
+  };
+
+  const handleStartNewTask = () => {
+    setActiveTaskId(null);
+    setTaskInput('');
+    setError(null);
+  };
+
+  const formatTaskDate = (isoStr: string) => {
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   };
 
   const getRoleIcon = (roleName: string) => {
@@ -133,45 +214,137 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
 
   return (
     <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl space-y-6">
+      
       {/* Title Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 shadow-sm">
               <Bot className="w-3.5 h-3.5 text-cyan-400" />
               AI RACI Copilot
             </span>
-            <span className="text-xs text-slate-400">Умный диспетчер ролей</span>
+            <span className="text-xs text-slate-400">Умный диспетчер ролей с автосохранением в историю</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
             Опишите задачу — ИИ разложит её по ролям и RACI
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
-            Сформулируйте действие обычным языком. Нейросеть определит порядок смены шляп (Founder ➔ Growth ➔ Engineer), выявит риски и подготовит пошаговый план.
+            Все разобранные задачи навсегда сохраняются в истории вашего браузера: вы никогда не потеряете план действий при перезагрузке.
           </p>
         </div>
 
-        <button
-          onClick={onOpenAiSettings}
-          className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-all self-start sm:self-center"
-        >
-          <Settings className="w-3.5 h-3.5 text-slate-400" />
-          <span>Настройки AI</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={onOpenAiSettings}
+            className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-400" />
+            <span>Настройки AI</span>
+          </button>
+
+          <button
+            onClick={handleStartNewTask}
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 cursor-pointer"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>Новая задача</span>
+          </button>
+        </div>
       </div>
 
-      {/* Input Section */}
+      {/* History Ribbon (Saved Decompositions) */}
+      {history.length > 0 && (
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-slate-300 uppercase tracking-wider">
+              <History className="w-4 h-4 text-cyan-400" />
+              <span>Сохранённая история разборов ({history.length})</span>
+            </div>
+
+            <button
+              onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
+              className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold"
+            >
+              {showHistoryDrawer ? 'Свернуть историю' : 'Развернуть историю'}
+            </button>
+          </div>
+
+          {showHistoryDrawer && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+              {history.map((item) => {
+                const isSelected = item.id === activeTaskId;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTaskId(item.id);
+                      setError(null);
+                    }}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 text-left relative group ${
+                      isSelected
+                        ? 'bg-indigo-950/40 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/30'
+                        : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06] hover:border-white/15'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          {formatTaskDate(item.createdAt)}
+                        </span>
+
+                        <button
+                          onClick={(e) => handleDeleteTaskFromHistory(item.id, e)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 rounded transition-opacity"
+                          title="Удалить из истории"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="text-xs font-bold text-white line-clamp-2 leading-snug">
+                        {item.result.taskSummary || item.rawPrompt}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-white/5 text-[10px]">
+                      <span className="text-cyan-300 font-semibold truncate max-w-[150px]">
+                        {item.result.raciBreakdown.accountable.split(' ')[0]} (A)
+                      </span>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.isChecklistAdded && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Чек-лист ✓
+                          </span>
+                        )}
+                        {item.isDecisionAdded && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            Журнал ✓
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Input Section (When creating or switching) */}
       <div className="space-y-3">
         <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">
-          Какую задачу вы планируете выполнить?
+          Сформулируйте новую задачу для анализа:
         </label>
         
         <div className="relative">
           <textarea
             value={taskInput}
             onChange={(e) => setTaskInput(e.target.value)}
-            placeholder="Например: Хочу перенести базу пациентов и сайт с турецкого сервера на российский VPS по 152-ФЗ..."
-            rows={3}
+            placeholder="Например: Хочу запустить акцию к 8 марта по спящей базе 120+ дней с депозитом 2000 ₽..."
+            rows={2}
             className="w-full glass-input px-4 py-3 rounded-2xl text-xs sm:text-sm placeholder:text-slate-500 resize-none"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -183,7 +356,7 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
 
         {/* Quick Presets */}
         <div className="space-y-1.5">
-          <div className="text-[11px] text-slate-400 font-semibold">Быстрые примеры для проверки:</div>
+          <div className="text-[11px] text-slate-400 font-semibold">Быстрые примеры:</div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap">
             {PRESET_EXAMPLES.map((ex, idx) => (
               <button
@@ -202,7 +375,7 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
         </div>
 
         {/* Action Button */}
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-1">
           <button
             onClick={() => handleDecompose()}
             disabled={loading || !taskInput.trim()}
@@ -240,30 +413,31 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
         )}
       </div>
 
-      {/* Analysis Results Display */}
-      {analysisResult && (
+      {/* Analysis Results Display (Loaded from Active Task or New Run) */}
+      {analysisResult ? (
         <div className="space-y-6 pt-4 border-t border-white/10 animate-fadeIn">
           
           {/* Header Summary */}
-          <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex items-center justify-between gap-3">
+          <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                Суть задачи
-              </span>
-              <h3 className="text-base font-extrabold text-white mt-0.5">
+              <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Активная задача из истории {activeTask && `(${formatTaskDate(activeTask.createdAt)})`}</span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white mt-1">
                 {analysisResult.taskSummary}
               </h3>
             </div>
-            <button
-              onClick={() => {
-                setAnalysisResult(null);
-                setTaskInput('');
-              }}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white"
-              title="Сбросить результат"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleStartNewTask}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-white/10"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Сформулировать другую</span>
+              </button>
+            </div>
           </div>
 
           {/* Risks & Stop Flags Banner */}
@@ -392,15 +566,15 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
               {onAddToChecklist && (
                 <button
                   onClick={handleAddTasksToChecklist}
-                  disabled={isChecklistAdded}
+                  disabled={activeTask?.isChecklistAdded}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                    isChecklistAdded
+                    activeTask?.isChecklistAdded
                       ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default'
-                      : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md'
+                      : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md cursor-pointer'
                   }`}
                 >
-                  {isChecklistAdded ? <Check className="w-3.5 h-3.5" /> : <CheckSquare className="w-3.5 h-3.5" />}
-                  <span>{isChecklistAdded ? 'Добавлено в Чек-лист' : '➕ Добавить в Чек-лист запуска'}</span>
+                  {activeTask?.isChecklistAdded ? <Check className="w-3.5 h-3.5" /> : <CheckSquare className="w-3.5 h-3.5" />}
+                  <span>{activeTask?.isChecklistAdded ? 'Уже добавлено в Чек-лист ✓' : '➕ Добавить в Чек-лист запуска'}</span>
                 </button>
               )}
             </div>
@@ -434,15 +608,15 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
                 {onAddToDecisionLog && (
                   <button
                     onClick={handleSaveToDecisionLog}
-                    disabled={isDecisionAdded}
+                    disabled={activeTask?.isDecisionAdded}
                     className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                      isDecisionAdded
+                      activeTask?.isDecisionAdded
                         ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default'
-                        : 'bg-purple-600 hover:bg-purple-500 text-white shadow-md'
+                        : 'bg-purple-600 hover:bg-purple-500 text-white shadow-md cursor-pointer'
                     }`}
                   >
-                    {isDecisionAdded ? <Check className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                    <span>{isDecisionAdded ? 'Зафиксировано в журнале' : '📜 Сохранить в Журнал решений'}</span>
+                    {activeTask?.isDecisionAdded ? <Check className="w-3.5 h-3.5" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                    <span>{activeTask?.isDecisionAdded ? 'Уже зафиксировано в журнале ✓' : '📜 Сохранить в Журнал решений'}</span>
                   </button>
                 )}
               </div>
@@ -467,7 +641,7 @@ export const AiRaciCopilotWidget: React.FC<AiRaciCopilotWidgetProps> = ({
           )}
 
         </div>
-      )}
+      ) : null}
 
     </div>
   );

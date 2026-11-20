@@ -117,3 +117,12 @@ export interface AiRaciAnalysisResult {
     approverRole: 'Клиент-косметолог' | 'Вы как Founder' | 'Вы как Growth (Маркетинг/Sales)' | 'Вы как Product Owner' | 'Вы как Engineer';
   };
 }
+
+export interface SavedRaciAiTask {
+  id: string;
+  createdAt: string; // ISO
+  rawPrompt: string;
+  result: AiRaciAnalysisResult;
+  isChecklistAdded?: boolean;
+  isDecisionAdded?: boolean;
+}
