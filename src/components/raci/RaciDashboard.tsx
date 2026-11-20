@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { RaciStorageState, ClientCardArtifact, DecisionLogEntry, WeeklyReportData } from '../../types/raci';
+import type { RaciStorageState, ClientCardArtifact, ChecklistItem, DecisionLogEntry, WeeklyReportData } from '../../types/raci';
 import { getStoredRaciData, saveRaciData, resetRaciData } from '../../utils/raciStorage';
 import { ThreeQuestionsWidget } from './ThreeQuestionsWidget';
 import { RaciMatrixTable } from './RaciMatrixTable';
@@ -7,6 +7,7 @@ import { ArtifactClientCard } from './ArtifactClientCard';
 import { ArtifactChecklist } from './ArtifactChecklist';
 import { ArtifactDecisionLog } from './ArtifactDecisionLog';
 import { ArtifactWeeklyReport } from './ArtifactWeeklyReport';
+import { AiRaciCopilotWidget } from './AiRaciCopilotWidget';
 import { 
   ShieldCheck, 
   HelpCircle, 
@@ -17,27 +18,30 @@ import {
   TrendingUp, 
   RotateCcw, 
   Layers, 
-  ArrowRight,
+  ArrowRight, 
   ExternalLink,
-  Users
+  Users,
+  Bot
 } from 'lucide-react';
 
 interface RaciDashboardProps {
   onShowToast: (msg: string) => void;
   onGoToProjects?: () => void;
   onGoToCrm?: () => void;
+  onOpenAiSettings: () => void;
 }
 
-export type RaciSubTab = 'questions' | 'matrix' | 'artifacts';
+export type RaciSubTab = 'copilot' | 'matrix' | 'questions' | 'artifacts';
 export type ArtifactSubTab = 'card' | 'checklist' | 'decisions' | 'report';
 
 export const RaciDashboard: React.FC<RaciDashboardProps> = ({
   onShowToast,
   onGoToProjects,
-  onGoToCrm
+  onGoToCrm,
+  onOpenAiSettings
 }) => {
   const [raciState, setRaciState] = useState<RaciStorageState>(() => getStoredRaciData());
-  const [subTab, setSubTab] = useState<RaciSubTab>('matrix');
+  const [subTab, setSubTab] = useState<RaciSubTab>('copilot');
   const [artifactTab, setArtifactTab] = useState<ArtifactSubTab>('card');
 
   const updateAndSave = (newState: RaciStorageState) => {
@@ -53,6 +57,11 @@ export const RaciDashboard: React.FC<RaciDashboardProps> = ({
     const updated = raciState.checklist.map((item) => 
       item.id === id ? { ...item, completed: !item.completed } : item
     );
+    updateAndSave({ ...raciState, checklist: updated });
+  };
+
+  const handleAddChecklistItems = (items: ChecklistItem[]) => {
+    const updated = [...items, ...raciState.checklist];
     updateAndSave({ ...raciState, checklist: updated });
   };
 
@@ -117,6 +126,14 @@ export const RaciDashboard: React.FC<RaciDashboardProps> = ({
             </p>
 
             <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <button
+                onClick={() => setSubTab('copilot')}
+                className="px-3.5 py-1 rounded-xl bg-gradient-to-r from-purple-600/30 via-indigo-600/30 to-cyan-600/30 hover:from-purple-600/50 hover:to-cyan-600/50 text-cyan-200 hover:text-white text-xs font-bold flex items-center gap-1.5 border border-cyan-500/30 transition-all shadow-md cursor-pointer"
+              >
+                <Bot className="w-3.5 h-3.5 text-cyan-300 animate-pulse" />
+                <span>🤖 AI-Диспетчер ролей</span>
+              </button>
+
               {onGoToProjects && (
                 <button
                   onClick={onGoToProjects}
@@ -168,6 +185,21 @@ export const RaciDashboard: React.FC<RaciDashboardProps> = ({
         {/* Sub-tabs switcher */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <button
+            onClick={() => setSubTab('copilot')}
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              subTab === 'copilot'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-purple-600/30'
+                : 'glass-panel text-slate-400 hover:text-white border-white/5'
+            }`}
+          >
+            <Bot className="w-4 h-4 text-cyan-300 animate-pulse" />
+            <span>🤖 AI-Диспетчер ролей</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-extrabold">
+              Copilot
+            </span>
+          </button>
+
+          <button
             onClick={() => setSubTab('matrix')}
             className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               subTab === 'matrix'
@@ -176,7 +208,7 @@ export const RaciDashboard: React.FC<RaciDashboardProps> = ({
             }`}
           >
             <Table className="w-4 h-4" />
-            <span>RACI Матрица продукта</span>
+            <span>RACI Матрица</span>
           </button>
 
           <button
@@ -276,7 +308,14 @@ export const RaciDashboard: React.FC<RaciDashboardProps> = ({
       )}
 
       {/* View Content Rendering */}
-      {subTab === 'questions' ? (
+      {subTab === 'copilot' ? (
+        <AiRaciCopilotWidget
+          onAddToChecklist={handleAddChecklistItems}
+          onAddToDecisionLog={handleAddDecision}
+          onOpenAiSettings={onOpenAiSettings}
+          onShowToast={onShowToast}
+        />
+      ) : subTab === 'questions' ? (
         <ThreeQuestionsWidget
           onGoToChecklist={() => {
             setSubTab('artifacts');

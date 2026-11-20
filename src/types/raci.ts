@@ -83,3 +83,37 @@ export interface RaciStorageState {
   decisionLog: DecisionLogEntry[];
   weeklyReport: WeeklyReportData;
 }
+
+export interface AiRaciHatStep {
+  role: 'Founder' | 'Growth' | 'Product Owner' | 'Engineer' | 'QA' | 'Клиент-косметолог';
+  stage: string;
+  action: string;
+  hatExplanation: string;
+}
+
+export interface AiRaciAnalysisResult {
+  taskSummary: string;
+  hatsSequence: AiRaciHatStep[];
+  raciBreakdown: {
+    accountable: string;
+    responsible: string;
+    consulted: string;
+    informed: string;
+  };
+  risksAndStopFlags: {
+    requiresClientApproval: boolean;
+    requiresPilotTest: boolean;
+    warningText: string;
+  };
+  actionChecklist: Array<{
+    title: string;
+    roleTag: string;
+    required: boolean;
+  }>;
+  decisionLogDraft?: {
+    decision: string;
+    rationale: string;
+    approvedBy: string;
+    approverRole: 'Клиент-косметолог' | 'Вы как Founder' | 'Вы как Growth (Маркетинг/Sales)' | 'Вы как Product Owner' | 'Вы как Engineer';
+  };
+}

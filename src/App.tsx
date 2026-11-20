@@ -448,6 +448,7 @@ export function App() {
               handleFilterChange({ status: 'all' });
             }}
             onGoToCrm={() => handleTabChange('clients')}
+            onOpenAiSettings={() => setIsAiSettingsOpen(true)}
           />
         ) : currentTab === 'archive' ? (
           /* Archive Section View */

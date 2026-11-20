@@ -6,6 +6,7 @@ import type {
   DeepSeekModel,
   AiProvider
 } from '../types/ai';
+import type { AiRaciAnalysisResult } from '../types/raci';
 import type { Project } from '../types/project';
 import { calculateProjectFinancials, calculateProjectProgress, getDeadlineStatus } from '../utils/formatters';
 
@@ -527,3 +528,108 @@ function cleanJsonString(str: string): string {
   }
   return text.trim();
 }
+
+/**
+ * 4. AI RACI Copilot / Диспетчер ролей для соло-предпринимателя
+ */
+export async function decomposeTaskWithRaci(
+  userTask: string,
+  clientContext: string = 'Клиника косметологии (AI Admin для возврата спящей базы)'
+): Promise<AiRaciAnalysisResult> {
+  const systemPrompt = `Ты — элитный ментор соло-фаундеров и главный архитектор операционной системы RACI для IT/AI-агентств.
+Пользователь — соло-предприниматель, который физически работает ОДИН над продуктом AI Admin (ресепшионисты и возврат спящей базы для косметологических клиник).
+Он носит несколько ролей:
+- Founder (Стратегия, деньги, юридическая безопасность, выбор ключевых решений)
+- Growth (Маркетинг & Sales: B2B привлечение клиник, офферы для спящих пациентов, A/B тесты)
+- Product Owner (Логика бота, сценарии диалогов, CJM, воронка)
+- Engineer (Код, мосты WhatsApp/Telegram, Docker, серверы VPS, базы SQLite)
+- QA (Контроль, тест на 20-50 контактов, проверка переменных, стресс-тесты)
+- Клиент-косметолог (Владелец базы пациентов, медицинские формулировки, 152-ФЗ, финальный аппрув на отправку)
+
+Пользователь описывает задачу своими словами. Твоя задача:
+1. Разложить выполнение на последовательную цепочку смены «шляп» (в каком порядке действовать, чтобы не перегружать мозг).
+2. Определить точную матрицу RACI для этой задачи (кто Accountable — строго один, кто Responsible, Consulted, Informed).
+3. Проверить стоп-краны:
+   - Требуется ли обязательный письменный аппрув косметолога? (Если затрагивает пациентов, репутацию или скидки).
+   - Требуется ли пилотный тест на 20-50 контактов? (Если отправляются сообщения по реальной базе).
+4. Сформировать пошаговый чек-лист.
+5. Подготовить проект записи в Журнал решений (Decision Log).
+
+Контекст проекта: ${clientContext}
+
+Ответь СТРОГО JSON-объектом следующей структуры:
+{
+  "taskSummary": "Краткая и четкая формулировка сути задачи",
+  "hatsSequence": [
+    {
+      "role": "Founder" | "Growth" | "Product Owner" | "Engineer" | "QA" | "Клиент-косметолог",
+      "stage": "Шаг 1: Оценка риска и бюджет",
+      "action": "Конкретное действие в этой роли",
+      "hatExplanation": "Почему именно в этой шляпе это делается"
+    }
+  ],
+  "raciBreakdown": {
+    "accountable": "Кто единственный владелец результата (A) и почему",
+    "responsible": "Кто делает работу руками (R)",
+    "consulted": "С кем обязательно проконсультироваться (C)",
+    "informed": "Кого поставить в известность (I)"
+  },
+  "risksAndStopFlags": {
+    "requiresClientApproval": true/false,
+    "requiresPilotTest": true/false,
+    "warningText": "Предупреждение о рисках (152-ФЗ, спам, репутация, блокировки)"
+  },
+  "actionChecklist": [
+    {
+      "title": "Формулировка конкретного шага",
+      "roleTag": "Founder" | "Growth" | "Product Owner" | "Engineer" | "QA",
+      "required": true
+    }
+  ],
+  "decisionLogDraft": {
+    "decision": "Что именно решили зафиксировать",
+    "rationale": "Бизнес или техническое обоснование",
+    "approvedBy": "Имя или должность того, кто утверждает",
+    "approverRole": "Вы как Founder" | "Вы как Growth (Маркетинг/Sales)" | "Вы как Product Owner" | "Вы как Engineer" | "Клиент-косметолог"
+  }
+}`;
+
+  const rawJson = await callDeepSeekChat(
+    [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Разложи задачу по системе RACI и цепочке ролей соло-фаундера:\n"${userTask}"` }
+    ],
+    { json: true, temperature: 0.25 }
+  );
+
+  try {
+    const cleaned = cleanJsonString(rawJson);
+    const parsed = JSON.parse(cleaned);
+    return {
+      taskSummary: parsed.taskSummary || userTask,
+      hatsSequence: Array.isArray(parsed.hatsSequence) ? parsed.hatsSequence : [],
+      raciBreakdown: {
+        accountable: parsed.raciBreakdown?.accountable || 'Вы как Founder',
+        responsible: parsed.raciBreakdown?.responsible || 'Вы как Engineer',
+        consulted: parsed.raciBreakdown?.consulted || 'Клиент-косметолог',
+        informed: parsed.raciBreakdown?.informed || 'Администратор'
+      },
+      risksAndStopFlags: {
+        requiresClientApproval: Boolean(parsed.risksAndStopFlags?.requiresClientApproval),
+        requiresPilotTest: Boolean(parsed.risksAndStopFlags?.requiresPilotTest),
+        warningText: parsed.risksAndStopFlags?.warningText || 'Соблюдайте правила безопасного запуска.'
+      },
+      actionChecklist: Array.isArray(parsed.actionChecklist) ? parsed.actionChecklist : [],
+      decisionLogDraft: parsed.decisionLogDraft ? {
+        decision: parsed.decisionLogDraft.decision || userTask,
+        rationale: parsed.decisionLogDraft.rationale || 'Обоснование зафиксировано AI-диспетчером',
+        approvedBy: parsed.decisionLogDraft.approvedBy || 'Вы как Founder',
+        approverRole: parsed.decisionLogDraft.approverRole || 'Вы как Founder'
+      } : undefined
+    };
+  } catch (err) {
+    console.error('Failed to parse AI RACI decomposition:', rawJson, err);
+    throw new Error('Не удалось разобрать ответ ИИ-диспетчера ролей. Попробуйте уточнить формулировку задачи.');
+  }
+}
+
